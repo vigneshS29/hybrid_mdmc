@@ -287,7 +287,7 @@ def parse_concentration(conc_file):
 
     return counts,times,selected_rxns
 
-def parse_scale(scale_file,scale_prev_cycles):
+def parse_scale(scale_file,windowsize_MDMCcycles=1e10):
 
     """Parser for a scaling file (.scale)
 
@@ -346,9 +346,8 @@ def parse_scale(scale_file,scale_prev_cycles):
 
     # Create a list of MDMC cycles
     MDMCcycles = [ (num,tup) for num,tup in enumerate([ (step,rc) for step in sorted(scale.keys()) for rc in sorted(scale[step].keys()) ]) ]
-    if scale_prev_cycles > len(MDMCcycles):
-        scale_prev_cycles = len(MDMCcycles)
-    MDMCcycles = MDMCcycles[int(len(MDMCcycles)-scale_prev_cycles):]
+    windowsize_MDMCcycles = np.min([len(MDMCcycles),windowsize_MDMCcycles])
+    MDMCcycles = MDMCcycles[int(len(MDMCcycles)-windowsize_MDMCcycles):]
 
     # Print a warning if padding will occur
     missing_rxn = []

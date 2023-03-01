@@ -106,7 +106,7 @@ class ReactionList():
     ids: list of integers
         Reaction IDs (i.e. system number assigned to specific reaction).
     rxn_types: list of integers
-        Reaction types, as specified in teh rxndf file.
+        Reaction types, as specified in the rxndf file.
     reactants: lists of lists of integers
         Reactants for the specific reaction, as specified by the molecule ID.
     rates: list of floats

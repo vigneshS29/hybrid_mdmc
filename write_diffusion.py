@@ -10,7 +10,7 @@ import pipes, json
 from scipy.spatial.distance import *
 from copy import deepcopy
 from mol_classes import AtomList,IntraModeList
-from RMDClasses import MoleculeList,ReactionList
+from hybrid_mdmc.classes import MoleculeList,ReactionList
 from data_file_parser import parse_data_file
 from lammps_files_classes import write_lammps_data,write_lammps_init
 

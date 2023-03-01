@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import *
 from copy import deepcopy
+from sklearn import linear_model
 from hybrid_mdmc.classes import MoleculeList,ReactionList
 
 
@@ -353,7 +354,7 @@ def find_dist_same(geo,box):
     return rs
 
 
-def get_progression(counts,times,selected_rxns,reaction_types,species,window_size):
+def get_progression(counts,times,selected_rxns,reaction_types,species,windowsize=1e10):
     """Converts history information into a progression DataFrame.
 
     Given the system history, this function returns a DataFrame
@@ -395,8 +396,8 @@ def get_progression(counts,times,selected_rxns,reaction_types,species,window_siz
         (num,tup) for num,tup in enumerate([ 
         (step,rc) for step in sorted(counts.keys()) for rc in sorted(counts[step].keys()) ])
     ]
-    temp_window_size = np.min([window_size,len(mdmc_cycles)])
-    mdmc_cycles = mdmc_cycles[int(len(mdmc_cycles)-temp_window_size):]
+    windowsize = np.min([windowsize,len(mdmc_cycles)])
+    mdmc_cycles = mdmc_cycles[int(len(mdmc_cycles)-windowsize):]
 
     # Declare the progression columns and data objects
     index_ = [ i[0] for i in mdmc_cycles ]
@@ -420,142 +421,19 @@ def get_progression(counts,times,selected_rxns,reaction_types,species,window_siz
     return progression,mdmc_cycles
 
 
-def scale_rates(
-        rxn_scaling,progression,rxn_data,scalingcriteria_rxns,scalingcriteria_molecules,max_scaling,
-        scaling_relativerate=False,scaling_progression=False,style=None,scaling_wait=1):
-    """Scale reaction rates.
-
-    Given certain criteria and the system history, this function
-    returns scaling for reaction rates.
-
-    Parameters
-    ----------
-    rxn_scaling: pandas.DataFrame
-        - index: one row, representing the latest mdmc cycle
-        - columns: rxn nums
-        - entries: current scaling factors
-    progression: pandas.DataFrame
-        - index: mdmc cycle
-        - columns: 'time', rxn num, or species
-        - entries: time entry (float), or reaction count (int),
-                   or species number fraction (float)
-    rxn_data: dict
-        - contains information about the predescribed reactions
-        - see hybridmdmc.parsers.parse_rxn_data
-        - also holds raw rxn rate in the 'rate' key
-    """
-
-    # Check for argument validity
-    if scalingcriteria_molecules < 0:
-        print('Error! scalingcriteria_molecules argument passed to '+\
-              'scale_rates is less than 0. Sending kill code...')
-        return 'kill'
-
-    # Calculate some values that will be used multiple times.
-    max_raw_rate = np.max([rxn_data[rn]['rate'] for rn in rxn_data.keys()])
-    min_raw_rate = np.min([rxn_data[rn]['rate'] for rn in rxn_data.keys()])
-    slope_relativerate = (max_scaling-1.0)/(max_raw_rate-min_raw_rate)
-    slope_progression = (max_scaling-1.0)/progression.shape[0]
-
-    # Generate a temporary DataFrame to hold the standard deviation of 
-    # the number fraction of each species between the indexed cycle and
-    # the most recent cycle, inclusive.. The index is reversed,
-    # listing the mdmc cycles in descending order. This helps find the
-    # oldest cycle that begins a consecutive run of cycles satisfying
-    # the appropraite scalecriteria_molecules.
-    df_ = pd.DataFrame(
-        data={
-            m:[np.std(progression.loc[:,m][::-1][:idx+1]) for idx in range(progression.shape[0])]
-            for m in progression.columns if isinstance(m,str) and m != 'time'},
-        index=progression.index[::-1]
-    )
-
-    #### DEBUG: check standard deviation and mdmc index reversal is correctly performed
-
-    # Generate the molecule_cycles dictionary.
-    # The molecule_cycles dictionary contains the oldest mdmc cycle
-    # of the current consecutive run of cycles for which the standard 
-    # deviation of the species mole fraction satisfies
-    # scalingcriteria_molecules.
-    molecule_cycles = {
-        m:(
-            df_.index[np.argwhere(np.array(df_.loc[:,m]) > scalingcriteria_molecules)[0][0]-1]
-            if np.argwhere(np.array(df_.loc[:,m]) > scalingcriteria_molecules).size > 0
-            else df_.shape[0]
-        )
-        for m in df_.columns
-    }
-
-    #### DEBUG: check appropriate assignment in molecule_cycles
-
-    # 
-
-    # If "static" scaling is being performed, reset all scalings.
-    if style=='static':
-        rxn_scaling[:] = 1.0000
-
-    # Loop over all reactions
-    for rxn_num in rxn_data.keys():
-        cycles = []
-        progression_factor = 1.0
-        relative_factor = 1.0
-
-        # Check reaction selection criteria
-        selection_count = np.array(progression.loc[:,rxn_num][::-1])
-        if np.all( selection_count >= rxn_selection_threshold ):
-            cycles.append(progression.shape[0])
-        elif np.any( selection_count >= rxn_selection_threshold ):
-            cycles.append(np.argwhere( selection_count < rxn_selection_threshold )[0][0])
-        else:
-            cycles.append(0)
-
-        # Check number fraction criteria
-        for sp in rxn_data[rxn_num]['reactant_molecules'] + rxn_data[rxn_num]['product_molecules']:
-            num_fraction = np.array(progression.loc[:,sp][::-1])
-            num_fraction = np.array([ np.std(num_fraction[:idx]) for idx in range(1,len(num_fraction)+1) ])
-        if np.all( num_fraction <= num_fraction_threshold ):
-            cycles += [progression.shape[0]]
-        elif np.any( num_fraction <= num_fraction_threshold ):
-            cycles += [ np.argwhere( num_fraction > num_fraction_threshold )[0][0] ]
-        else:
-            cycles += [0]
-            
-
-
-# Calculate the progression scaling factor
-            progression_factor = slope2*(np.min(cycles)) + 1.0
-
-        # Calculate relative reaction rate scaling, if requested
-        factor1 = 1.0
-        if rel_scale and np.min(cycles) == progression.shape[0]:
-            factor1 = slope1*(rxn_data[rxn_num]['rate']-min_raw_rate) + 1.0
-
-        # Adjust reaction scaling factor appropriately
-        rxn_scaling.loc[rxn_scaling.index[-1],rxn_num] *= (factor1 * factor2)
-
-        # If this is cumulative scaling, check for reaction selection
-        if style == 'cumulative':
-            if np.max(selection_count[-cont_pause:]) != 0:
-                rxn_scaling.loc[rxn_scaling.index[-1],rxn_num] = 1.0
-
-    return rxn_scaling
-
-
-def update_progression(progression,molecules,species,time,selected_rxns,scale_prev_cycles):
+def update_progression(progression,molecules,species,time,selected_rxns,windowsize_MDMCcycles=1e10):
 
     add_index = [progression.index[-1] + 1]
     add_columns = progression.columns
-    add_data = {}
-    add_data['time'] = [time]
-    for c in progression.columns:
-        if type(c) != int: continue
+    add_data = {'time': [time]}
+    for c in [_ for _ in progression.columns if type(_) == int]:
         add_data[c] = [selected_rxns.count(c)]
     for sp in species:
-        add_data[sp] = [len([ 1 for i in molecules.mol_types if i==sp ])]
+        add_data[sp] = [len([ 1 for _ in molecules.mol_types if _ == sp ])]
     add_df = pd.DataFrame( data=add_data, index=add_index, columns=add_columns )
     add_df.loc[:,species[0]:species[-1]] = add_df.loc[:,species[0]:species[-1]].div(add_df.loc[:,species[0]:species[-1]].sum(axis=1),axis=0)
     progression = pd.concat([progression,add_df])
-    if progression.shape[0] > scale_prev_cycles:
+    if progression.shape[0] > windowsize_MDMCcycles:
         progression = progression.drop(labels=progression.index[0],axis=0)
 
     return progression
@@ -582,3 +460,259 @@ def write_tracking_file(file_name,lines,driver='\"Driver name\"',time='\"datetim
             f.write(l)
 
     return
+
+
+def ratescaling_scalerxns(
+        rxndata,rxnmatrix,rxnscaling,progression,
+        windowsize_slope,windowsize_scalingpause,
+        scalingcriteria_concentration_slope,scalingcriteria_concentration_cycles,
+        scalingfactor_adjuster,scalingfactor_minimum,rxnlist='all'):
+    """Scale reaction rates.
+
+    Given certain criteria and the system history, this function
+    returns scaling for reaction rates.
+    
+    Criteria:
+    1. The rolling mean of the concentration of a reaction's reactants
+    (and products?) is "unchanging" (deviation maximum to be provided
+    by user) for a user-defined number of cycles.
+
+    Scaling:
+    1. Downscale reactions in each step by either a set value, OR by the
+    product of a set value and the ratio of the raw reaction rate over
+    the maximum raw reaction rate.
+    2. Set a floor for reaction scaling. Can either be a set value, OR
+    it can depend on the raw reaction rates, for instance never drop
+    below the smallest raw reaction rate.
+    3. Amount of scaling can be dependent on the number of MDMC cycles
+    over which the specific reaction meets the scaling criteria.
+
+    Parameters
+    ----------
+    rxnscaling: pandas.DataFrame
+        - index: MDMC cycle number
+        - columns: rxn nums
+        - entries: scaling factors
+    progression: pandas.DataFrame
+        - index: mdmc cycle
+        - columns: 'time', rxn num, or species
+        - entries: time entry (float), or reaction count (int),
+                   or species number fraction (float)
+    rxndata: dict
+        - contains information about the predescribed reactions
+        - see hybridmdmc.parsers.parse_rxn_data
+        - also holds raw rxn rate in the 'rate' key
+    """
+
+    # Add a row to the rxnscaling; this requires adding 1 to the
+    # windowsize_scalingpause.
+    rxnscaling.loc[rxnscaling.index[-1]+1] = len(rxnscaling.columns)*[1.0]
+    windowsize_scalingpause += 1
+
+    # If the windowsize_rollingmean exceeds the current number of 
+    # MDMC cycles, return the rxnscaling dataframe with the added
+    # scaling of 1.0 for each reaction. By definition, this scenario
+    # produces no scaling.
+    if windowsize_slope > len(progression):
+        return rxnscaling
+
+    # For each species, determine the number of cycles that have occured
+    # for which the standard deviation in the rolling mean of the number
+    # fraction has met the scalingcriteria_rollingmean criteria.
+    #cyclesofconstantrollingmean = {}
+    #for column in progression.columns:
+    #    if column == 'time': continue
+    #    if type(column) == int or type(column) == float: continue
+    #    cyclesofconstantrollingmean[column] = get_cyclesofconstantrollingmean(
+    #        progression,column,windowsize_rollingmean,scalingcriteria_rollingmean_stddev)
+
+    # For each species, determine the number of cycles that have occured
+    # for which the slope of the concentration has met the
+    # scalingcriteria_concentration_slope criteria.
+    cyclesofconstantconcentration = {}
+    for column in progression.columns:
+        if column == 'time': continue
+        if type(column) == int or type(column) == float: continue
+        cyclesofconstantconcentration[column] = get_cyclesofconstantslope(
+            progression,column,windowsize_slope,scalingcriteria_concentration_slope)
+
+    # Loop over the desired reactions, scaling each appropriately.
+    if rxnlist == 'all':
+        rxnlist = list(rxnscaling.columns)
+    for rxnnum in rxnlist:
+
+        # Check if this reaction has been (un)scaled within the last
+        # "windowsize_pause" number of MDMC cycles. If it has, skip
+        # this reaction.
+        if get_cyclesofconstantscaling(rxnscaling,rxnnum) <= windowsize_scalingpause:
+            continue
+
+        # Create a list of all species involved in this reaction,
+        # reactants and products.
+        species_rxn = [c for c in rxnmatrix.columns if rxnmatrix.loc[rxnnum,c] != 0]
+
+        # If all of the species for this reaction have an unchanging
+        # rolling mean for more than or equal to
+        # scalingcriteria_rollingmean_cycles, scale this reaction.
+        if np.all(np.array([cyclesofconstantconcentration[s] for s in species_rxn]) >= scalingcriteria_concentration_cycles):
+            rxnscaling.loc[rxnscaling.index[-1],rxnnum] *= scalingfactor_adjuster
+
+        # If this reaction has fallen out of criteria, unscale it
+        else:
+            rxnscaling.loc[rxnscaling.index[-1],rxnnum] = 1.0
+        
+    # Finally, adjust all scaling factors that are below the minimum
+    # scaling factor back to the minimum scaling factor.
+    rxnscaling[rxnscaling < scalingfactor_minimum] = scalingfactor_minimum
+
+    return rxnscaling
+
+def ratescaling_unscalerxns(rxnmatrix,rxnscaling,progression,cycle=None):
+    """Unscale reaction rates.
+
+    Given certain criteria and the system history, this function
+    unscales reaction rates.
+    
+    Criteria:
+    1.
+
+    Unscaling:
+    1. If a scaled reaction is selected, all reactions connected to the
+    reactants and products of that reaction are unscaled.
+    2. If an unscaled reaction is selected, ALL reactions are unscaled.
+
+    Parameters
+    ----------
+    """
+
+    # By adding the currentcycle parameters, this function will
+    # explicitly examine the correct row of rxnscaling. Otherwise, might
+    # be buggy if the main script is edited and ratescaling_unscalerxns
+    # assumes the last row in rxnscaling is the most current cycle.
+    if cycle == None:
+        cycle = rxnscaling.index[-1]
+
+    # Loop over list of most recently selected reactions.
+    rxnlist = [_ for _ in progression.columns if type(_) != str and progression.loc[cycle,_] != 0 and _ != 0]
+    for rxntype in rxnlist:
+
+        # In the driver, the order of operations MUST be unscale THEN scale. Otherwise, scaling would never occur because at the of the algorithm, all reactions are unscaled, and thus an unscaled reaction will always be selected prior to any scaling. If the order was scale then unscale, all reactions would be unscaled at the begining, unless null reaction is selected for all voxels.
+
+        # Unscale all reactions if an unscaled reaction was selected,
+        # AND there is a currently scaled reaction. If this is the case,.
+        # all reactions are unscaled and rxnscaling is be returned
+        # immediately.
+        if rxnscaling.loc[cycle,rxntype] == 1.0: # and not np.all(np.array(rxnscaling.loc[cycle,:]) == 1.0):
+            rxnscaling.loc[cycle,:] = 1.0
+            return rxnscaling
+
+        # Unscale all reactions associated with all species in a scaled
+        # reaction that has been selected.
+        # for species in [_ for _ in rxnmatrix.columns if rxnmatrix.loc[rxntype,_] != 0]:
+        #    for rxntype2 in [_ for _ in rxnmatrix.index if rxnmatrix.loc[_,species] != 0]:
+        #        rxnscaling.loc[cycle,rxntype2] = 1.0
+
+    return rxnscaling
+
+
+def get_rxnmatrix(rxndata,masterspecies):
+    
+    rxndict = {s:{n:0 for n in rxndata.keys()} for s in masterspecies.keys()}
+    for n in rxndata.keys():
+        for s in rxndata[n]['reactant_molecules']:
+            rxndict[s][n] -= 1
+        for s in rxndata[n]['product_molecules']:
+            rxndict[s][n] += 1
+
+    return pd.DataFrame(data=rxndict,columns=sorted(list(masterspecies.keys())),index=sorted(list(rxndata.keys())))
+
+
+def get_cyclesofconstantscaling(rxnscaling,rxnnum):
+
+    # If the rxnscaling dataframe has no length, return a value of 0.
+    if len(rxnscaling) == 0:
+        return 0
+
+    # Create an array holding the scaling factors of the reaction in
+    # question, in reverse order.
+    rxnscaling_reverse = np.array(rxnscaling.loc[:,rxnnum][::-1])
+
+    # If all of the scaling values for this reaction are the same,
+    # return the length of the rxnscaling dataframe.
+    if len(set(rxnscaling_reverse)) == 1:
+        return len(rxnscaling_reverse)
+
+    # Otherwise, determine how many cycles have occured since the last
+    # scaling or unscaling event (i.e. how many cycles have occurred
+    # since the scaling factor changed).
+    return np.argwhere(rxnscaling_reverse[1:] != rxnscaling_reverse[:-1])[0][0] + 1
+
+
+def get_cyclesofconstantrollingmean(progression,column,windowsize_rollingmean,scalingcriteria_rollingmean_stddev):
+
+    # If the progression dataframe has no length, return a value of 0.
+    if len(progression) == 0:
+        return 0
+
+    # If the windowsize_rollingmean is equal to the length of the
+    # progession dataframe, "1" needs to be manually returned (the rest
+    # of the function won't appropriately handle this).
+    if len(progression) == windowsize_rollingmean:
+        return 1
+    
+    # Create an array holding the concentration, in reverse order.
+    concentration_reverse = np.array(progression.loc[:,column][::-1])
+
+    # Calculate the rolling mean using the provided window size, in
+    # reverse order. This array will be shorter than the progression
+    # dataframe by "windowsize_rollingmean."
+    rollingmean_reverse = np.array([
+        np.mean(concentration_reverse[idx:idx+windowsize_rollingmean])
+        for idx in range(0,len(concentration_reverse)-windowsize_rollingmean)])
+
+    # Calculate the standard deviation of the rolling mean, in reverse
+    # order.
+    stddev_rollingmean_reverse = np.array([
+        np.std(rollingmean_reverse[:idx+1]) for idx in range(len(rollingmean_reverse))])
+
+    # If all of the cycles satisfy the scalingcriteria_rollingmean,
+    # return the length of stddev_rollingmean_reverse. Not catching this
+    # results in an error in the next step.
+    if np.all(stddev_rollingmean_reverse <= scalingcriteria_rollingmean_stddev):
+        return len(stddev_rollingmean_reverse)
+
+    # Otherwise, return the index of the first instance where the
+    # standard deviation of the reverse rolling mean does NOT satisfy
+    # scalingcriteria_rollingmean. This represents the number of cycles,
+    # counting back from the current cycle, that satisfy the criteria.
+    return np.argwhere(stddev_rollingmean_reverse > scalingcriteria_rollingmean_stddev)[0][0]
+
+
+def get_cyclesofconstantslope(progression,column,windowsize_slope,scalingcriteria_concentration_slope):
+
+    # If the progression dataframe has no length, return a value of 0.
+    if len(progression) == 0:
+        return 0
+
+    # Create an array holding the concentration, in reverse order.
+    concentration_reverse = np.array(progression.loc[:,column][::-1])
+
+    # Calculate the absolute value of the slopes using the provided
+    # window size, in reverse order.
+    slope_reverse = np.array([
+        np.abs(linear_model.LinearRegression().fit(np.array(range(windowsize_slope)).reshape(-1,1),concentration_reverse[idx:idx+windowsize_slope]).coef_[0])
+        for idx in range(0,len(concentration_reverse)-windowsize_slope+1)])
+
+    # If all of the cycles satisfy the
+    # scalingcriteria_concentration_slope, return the length of
+    # concentration_reverse - windowsize_slope + 1. Not catching this
+    # results in an error in the next step.
+    if np.all(slope_reverse <= scalingcriteria_concentration_slope):
+        return len(concentration_reverse) - windowsize_slope + 1
+
+    # Otherwise, return the index of the first instance where the
+    # slope of the reverse concentraiton does NOT satisfy
+    # scalingcriteria_concentraiton_slope. This represents the number of
+    # cycles, counting back from the current cycle, that satisfy the
+    # criteria.
+    return np.argwhere(slope_reverse > scalingcriteria_concentration_slope)[0][0]
