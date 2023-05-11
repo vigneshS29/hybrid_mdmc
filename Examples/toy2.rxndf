@@ -1,0 +1,18 @@
+# A: 1/s
+# b: unitless
+# c: kcal/mol
+
+#--------------------------------------------------#
+Reaction Number: 1
+reactant_molecules: A A 
+product_molecules: AA 
+A:  1.0e12
+b:  1.0
+Ea: 8.69063081
+#--------------------------------------------------#
+Reaction Number: 2
+reactant_molecules: AA
+product_molecules: A A
+A:  1.0e12
+b:  1.0
+Ea: 9.30445004

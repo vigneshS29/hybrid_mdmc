@@ -1,0 +1,21 @@
+LAMMPS data file.
+
+0     atoms
+2     atom types
+0     bonds
+1     bond types
+0     angles
+0     angle_types
+0     dihedrals
+0     dihedral_types
+0     impropers
+0     improper_types
+
+-12.00000000 12.00000000  xlo xhi
+-12.00000000 12.00000000  ylo yhi
+-12.00000000 12.00000000  zlo zhi
+
+Masses
+
+1     16.0000 
+2     16.0000 

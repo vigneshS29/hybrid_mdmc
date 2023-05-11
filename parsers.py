@@ -283,7 +283,8 @@ def parse_concentration(conc_file):
             selected_rxns[step][rc] = []
             missing_sr.append((step,rc))
     if missing_sr:
-        print('Warning! Missing entries for selected rxns for the following DiffusionStep/ReactionCycle pairs: {}'.format(' '.join(['{},{}'.format(i[0],i[1]) for i in missing_sr])))
+        if (0,0) not in missing_sr:
+            print('Warning! Missing entries for selected rxns for the following DiffusionStep/ReactionCycle pairs: {}'.format(' '.join(['{},{}'.format(i[0],i[1]) for i in missing_sr])))
 
     return counts,times,selected_rxns
 

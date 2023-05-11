@@ -119,9 +119,6 @@ def spkmc_rxn(rxns,rxn_data,molecules,Rmax,translate_distance=0.0):
     rates = deepcopy(rxns.rates)
     rates = rates.tolist()
     rates.append(Rmax - np.sum(rates))
-    if rates[-1] < 0:
-        print('Error! Total voxel rate is greater than supplied Rmax. Sending kill code...')
-        return 'kill','kill','kill','kill'
     rxn_idx = np.argwhere(np.cumsum(rates)>=np.sum(rates)*u1)[0][0]
     if rxn_idx == len(rates)-1:
         return {},[],dt,0

@@ -62,6 +62,8 @@ def main(argv):
                         help='Space delimited strong defining custom bounds for the z-axis. Overrides third entry in -num_voxels')
     
     parser.add_argument('--distance_criteria', dest='distance_criteria', default=False, action='store_const', const=True)
+
+    parser.add_argument('--well_mixed', dest='well_mixed', default=False, action='store_const', const=True)
     
     # Parse the command line arguments.
     args = parser.parse_args()
@@ -105,6 +107,8 @@ def main(argv):
     if args.distance_criteria:
         geo = np.array([ [np.mean(voxels[v]['bounds'][d]) for d in range(3)] for v in sorted(voxels.keys()) ])
         diffusion_matrix = 1-find_scaled_dist_same(geo,box)
+    if args.well_mixed:
+        diffusion_matrix = np.ones((len(voxels),len(voxels)))
 
     # Write the diffusion file
     with open(args.prefix+'.diffusion','w') as f:

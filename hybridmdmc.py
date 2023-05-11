@@ -12,8 +12,8 @@ from hybrid_mdmc.classes import *
 from hybrid_mdmc.parsers import *
 from hybrid_mdmc.functions import *
 from hybrid_mdmc.kmc import *
-from data_file_parser import parse_data_file
-from lammps_files_classes import write_lammps_data,write_lammps_init
+from hybrid_mdmc.data_file_parser import parse_data_file
+from hybrid_mdmc.lammps_files_classes import write_lammps_data,write_lammps_init
 
 # Main argument
 def main(argv):
@@ -97,8 +97,11 @@ def main(argv):
     parser.add_argument('-scalingcriteria_concentration_slope', dest='scalingcriteria_concentration_slope', type=float, default=0.1,
                         help='Maximum (less than or equal to) slope of the number fraction of a molecular species for that number fraction to be considered stagnant.')
 
-    parser.add_argument('-scalingcriteria_concentration_cycles', dest='scalingcriteria_concentration_cycles', type=int, default=3,
+    parser.add_argument('-scalingcriteria_concentration_cycles', dest='scalingcriteria_concentration_cycles', type=int, default=1,
                         help='Minimum (greater than or equal to) number of MDMC cycles that a species number fraction must be stagnant for reactions involving that species to be scaled.')
+
+    parser.add_argument('-scalingcriteria_rxnselection_count', dest='scalingcriteria_rxnselection_count', type=int, default=1,
+                        help='Minimum number of times (greater than or equal to) that a reaciton must be selected in the previous _ steps in order ot be a candidate for scaling.')
 
     parser.add_argument('-windowsize_rollingmean', dest='windowsize_rollingmean', type=int, default=3,
                         help='Window size for the calculation of the rolling mean, measured in MDMC cycles.')
@@ -109,11 +112,17 @@ def main(argv):
     parser.add_argument('-windowsize_scalingpause', dest='windowsize_scalingpause', type=int, default=3,
                         help='Number of MDMC cycles after a reaciton is scaled or unscaled before it can be scaled again.')
 
+    parser.add_argument('-windowsize_rxnselection', dest='windowsize_rxnselection', type=int, default=10,
+                        help='Window size for checking the number of times a reaction has been selected.')
+
     parser.add_argument('-scalingfactor_adjuster', dest='scalingfactor_adjuster', type=float, default=0.1,
                         help='Quantity which a reaction rate is multiplied by to scale that rate.')
 
     parser.add_argument('-scalingfactor_minimum', dest='scalingfactor_minimum', type=float, default=1e-6,
                         help='Minimum reaction rate scaling factor for all reactions.')
+
+    parser.add_argument('-charged_atoms', dest='charged_atoms', type=bool, default=True,
+                       help='If True, atoms have charges. If False, atoms are treated as LJ particles and written without charges.')
 
     # Optional arguments - flags
     parser.add_argument('--debug', dest='debug', default=False, action='store_const', const=True)
@@ -220,12 +229,27 @@ def main(argv):
     Reacting,rxn_cycle = True,1
     while Reacting:
         
+        # If scaling is requested, unscale and scale the reactions
+        vox_list = sorted(list(set(molecules.voxels)))
+        #vox_list = ?
+        rxns_byvoxel = {vox:[] for vox in vox_list}
+        if args.scalerates:
+            PSSrxns = get_PSSrxns(
+                rxndata,rxnmatrix,rxnscaling,progression,
+                args.windowsize_slope,args.windowsize_scalingpause,
+                args.scalingcriteria_concentration_slope,args.scalingcriteria_concentration_cycles)
+            rxnscaling = ratescaling_unscalerxns(rxnmatrix,rxnscaling,progression,PSSrxns,cycle=progression.index[-1])
+            rxnscaling = ratescaling_scalerxns(
+                rxndata,rxnmatrix,rxnscaling,progression,PSSrxns,
+                args.scalingcriteria_rxnselection_count,
+                args.windowsize_scalingpause,args.windowsize_rxnselection,
+                args.scalingfactor_adjuster,args.scalingfactor_minimum,
+                rxnlist=sorted(list(set([ _[0] for vox in vox_list for _ in rxns_byvoxel[vox] ]))))
+
         if args.debug:
             breakpoint()
 
         # Loop over each voxel to get the reactions available in each voxel.
-        vox_list = sorted(list(set(molecules.voxels)))
-        rxns_byvoxel = {vox:[] for vox in vox_list}
         for vox in vox_list:
 
             # Create and populate an instance of the "ReactionList" class.
@@ -233,19 +257,6 @@ def main(argv):
 
             # Add the reaction data for this voxel to rxns_byvoxel.
             rxns_byvoxel[vox] = [(rxns.rxn_types[idx],_) for idx,_ in enumerate(rxns.rates)]
-
-        if args.debug:
-            breakpoint()
-
-        # If scaling is requested, unscale and scale the reactions
-        if args.scalerates:
-            rxnscaling = ratescaling_unscalerxns(rxnmatrix,rxnscaling,progression,cycle=progression.index[-1])
-            rxnscaling = ratescaling_scalerxns(
-                rxndata,rxnmatrix,rxnscaling,progression,
-                args.windowsize_slope,args.windowsize_scalingpause,
-                args.scalingcriteria_concentration_slope,args.scalingcriteria_concentration_cycles,
-                args.scalingfactor_adjuster,args.scalingfactor_minimum,
-                rxnlist=sorted(list(set([ _[0] for vox in vox_list for _ in rxns_byvoxel[vox] ]))))
 
         # Calculate the maximum voxel total reaction rate.
         Rmax = np.max([ np.sum([rxnscaling.loc[rxnscaling.index[-1],_[0]]*_[1] for _ in rxns_byvoxel[vox]]) for vox in vox_list ])
@@ -266,16 +277,16 @@ def main(argv):
                 rxns.rates = np.array([ r*rxnscaling.loc[rxnscaling.index[-1],rxns.rxn_types[ridx]] for ridx,r in enumerate(rxns.rates) ])
 
             # Execute reaction(s)
-            temp_delete = []
+            temp_delete,selected_rt = [],0
             if len(rxns.ids) > 0:
                 temp_add,temp_delete,dt,selected_rt = spkmc_rxn(rxns,rxndata,molecules,Rmax,translate_distance=2.0)
-                if temp_add == 'kill':
-                    print('Voxel: {} Rmax: {} Total rates: {}\nExiting...'.format(vox,Rmax,np.sum(rxns.rates)))
-                    quit()
                 add.update({ k+len(add):v for k,v in temp_add.items() })
                 delete += [x for i in temp_delete for x in i]
             molecount_current -= len(temp_delete)
             selected_rxn_types += [selected_rt]
+
+        if args.debug:
+            breakpoint()
 
         # Check for completion
         if molecount_current < (1-args.change_threshold)*molecount_starting:
@@ -284,11 +295,13 @@ def main(argv):
         # Check for erroneous double deletion
         if len(set(delete)) != len(delete):
             print('Error! Molecules deleted twice. Exiting...')
-            quit()
+            #quit()
 
         # If requested, print debugging information to the log file
         if args.log:
             with open(args.log_file,'a') as f:
+                for idx in range(len(molecules.ids)):
+                    print('{} {} {} {}'.format(molecules.ids[idx],molecules.mol_types[idx],molecules.voxels[idx],molecules.atom_ids[idx]))
                 f.write('add: {}\n'.format(add))
                 f.write('delete: {}\n'.format(delete))
                 f.write('selected_rxn_types: {}\n\n'.format(selected_rxn_types))
@@ -346,7 +359,7 @@ def main(argv):
         'run_steps': [ args.relax, args.diffusion],
         'run_temp': [ [args.temp,args.temp,10.0],[args.temp,args.temp,100.0] ],
         'run_press': [ [1.0,1.0,100.0],[1.0,1.0,100.0] ],
-        'run_timestep': [0.25,0.25],
+        'run_timestep': [0.25,1.0],
         'restart': False,
         'reset_steps': False,
         'thermo_keywords': ['temp', 'press', 'ke', 'pe']}
@@ -357,7 +370,7 @@ def main(argv):
     init['improper_style'] = 'cvff'
     init['neigh_modify'] = 'every 1 delay 0 check yes one 10000'
     init['coords_freq'] = 20
-    write_lammps_data(args.write_data,atoms,bonds,angles,dihedrals,impropers,box,header=data_header)
+    write_lammps_data(args.write_data,atoms,bonds,angles,dihedrals,impropers,box,header=data_header,charge=args.charged_atoms)
     write_lammps_init(init,args.write_init,step_restarts=False,final_restart=False,final_data=True)
 
     return
