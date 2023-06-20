@@ -280,8 +280,11 @@ def main(argv):
             temp_delete,selected_rt = [],0
             if len(rxns.ids) > 0:
                 temp_add,temp_delete,dt,selected_rt = spkmc_rxn(rxns,rxndata,molecules,Rmax,translate_distance=2.0)
+                if len(set(delete) & set([i for _ in temp_delete for i in _])) > 0:
+                    selected_rxn_types += [0]
+                    continue
                 add.update({ k+len(add):v for k,v in temp_add.items() })
-                delete += [x for i in temp_delete for x in i]
+                delete += [i for _ in temp_delete for i in _]
             molecount_current -= len(temp_delete)
             selected_rxn_types += [selected_rt]
 

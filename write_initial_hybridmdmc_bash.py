@@ -44,7 +44,10 @@ def main(argv):
                         help='Number of cores on which to run (int). Defualt: 16')
 
     parser.add_argument('-timelim', dest='timelim', type=str, default='06:00:00',
-                        help='Time limit of run (str). Default: 06:00:00')
+                        help='Time limit of run (str). Default: 03:00:00')
+
+    parser.add_argument('-voxels', dest='voxels', type=str, default='6 6 6',
+                        help='String of voxel delineations. Default: 6 6 6')
 
     # Parse the line arguments
     args = parser.parse_args()
@@ -136,7 +139,8 @@ def main(argv):
             "for i in `seq 0 600`;do\n"+\
             "\n"+\
             "    # Run RMD script\n"+\
-            "    python3 ~/bin/hybrid_mdmc/write_diffusion.py ${prefix}.end.data -prefix ${prefix} -num_voxels '6 6 6' --well_mixed\n"+\
+            "    python3 ~/bin/hybrid_mdmc/write_diffusion.py ${prefix}.end.data -prefix ${prefix} -num_voxels "+\
+            "'{}' --well_mixed\n".format(args.voxels)+\
             "    python3 ~/bin/hybrid_mdmc/hybridmdmc.py ${prefix}.end.data ${prefix}.diffusion -prefix ${prefix} -diffusion_step ${i}\\\n"+\
             "        -msf ${system}.msf -rxndf ${system}.rxndf -settings ${system}.in.settings -header ${system}.header\\\n"+\
             "        -temp ${Temperature} -relax ${RelaxationTime} -diffusion ${DiffusionTime}\\\n"+\

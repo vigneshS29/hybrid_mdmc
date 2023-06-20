@@ -166,7 +166,7 @@ def get_rxns(molecules,vox,voxelID2idx,diffusion_matrix,delete,rxn_data,diffusio
 
     for rxn_type in rxn_data.keys(): # Loop over every possible reaction in the rxn_data
         for rmID in rmol_IDs: # Loop over each reactive molecule in the voxel
-            if rmID in delete: continue # If this molecule has already reacted, skip it
+            #if rmID in delete: continue # If this molecule has already reacted, skip it
             if molecules.mol_types[molID2idx[rmID]] not in rxn_data[rxn_type]['reactant_molecules']: continue # Skip if this molecule cannot undergo this rxn
             reactant_types = deepcopy(rxn_data[rxn_type]['reactant_molecules'])
             reactant_types.remove(molecules.mol_types[molID2idx[rmID]]) # List of remaining reactant molecule types, if any, after removing the active molecule type
@@ -185,7 +185,7 @@ def get_rxns(molecules,vox,voxelID2idx,diffusion_matrix,delete,rxn_data,diffusio
                 partner_IDs = [ID for ID in molecules.ids
                                if diffusion_matrix[voxelID2idx[vox],voxelID2idx[molecules.voxels[molID2idx[ID]]]] >= diffusion_cutoff
                                and molecules.mol_types[molID2idx[ID]] == reactant_types[0]
-                               and ID not in delete
+                               #and ID not in delete
                                and ID != rmID]
                 for pID in partner_IDs:
                     rxns[rxn_count] = {

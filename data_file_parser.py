@@ -9,7 +9,7 @@
 #
 
 import numpy as np
-from mol_classes import AtomList,IntraModeList
+from hybrid_mdmc.mol_classes import AtomList,IntraModeList
 
 def parse_data_file(data_file, atom_style='full', preserve_atom_order=False, preserve_bond_order=False, preserve_angle_order=False, preserve_dihedral_order=False, preserve_improper_order=False,tdpd_conc=[],unwrap=False):
 
