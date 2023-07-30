@@ -5,7 +5,7 @@
 
 
 import numpy as np
-
+from hybrid_mdmc.functions import voxels2voxelsmap
 
 class MoleculeList(): 
     """Class for arrays of all molecule attributes.
@@ -104,9 +104,32 @@ class MoleculeList():
 
     def calc_cog(atomslist,box=None):
         self.cog = np.array([
-            np.mean(np.array([[atomslist.x[idx],atomslist.y[idx],atomslist.z[idx]] for idx,ID in enumerate(atomslist.ids) if ID in matoms]),axis=0) for matoms in self.atom_ids
-        ])
+            np.mean(
+                np.array([
+                    [atomslist.x[idx],atomslist.y[idx],atomslist.z[idx]]
+                    for idx,ID in enumerate(atomslist.ids) if ID in matoms])
+            ,axis=0)
+            for matoms in self.atom_ids])
+        if box:
+            for d in range(3):
+                while not np.all(self.cog[:,d]>=box[d][0]):
+                    self.cog[:,d] = np.where(self.cog[:,d]<box[d][0],self.cog[:,d]+(box[d][1]-box[d][0]),self.cog[:,d])
+                while not np.all(self.cog[:,d]<=box[d][1]):
+                    self.cog[:,d] = np.where(self.cog[:,d]>box[d][1],self.cog[:,d]-(box[d][1]-box[d][0]),self.cog[:,d])
 
+    def get_voxels(self,voxels):
+        if len(self.cog) != len(self.ids):
+            print('Error! Not all molecules assigned a center of geometry. Cannot assign voxels.')
+            voxellist = []
+        else:
+            voxelsmap,voxelsx,voxelsy,voxelsz = voxels2voxelsmap(voxels)
+            voxellist = [
+                voxelsmap[
+                    (np.argwhere(voxelsx<=cog[0])[-1][0],
+                     np.argwhere(voxelsy<=cog[1])[-1][0],
+                     np.argwhere(voxelsz<=cog[2])[-1][0] )][0]
+                for cog in self.cog ]
+        self.voxels = np.array(voxellist)
 
 class ReactionList():
     """Class for arrays of reaction information.

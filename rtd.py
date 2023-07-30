@@ -15,22 +15,28 @@ from PIL import Image
 from mpl_toolkits.mplot3d import Axes3D 
 
 # Argparse initializations
-parser = argparse.ArgumentParser(description = 'Molecular Dynamics Residence Time')
-parser.add_argument('data_file', type = str, help = 'Traj file')
-parser.add_argument('-N',dest='num_mol', type=int, default = 100, help = 'Number of molecules in box')
-parser.add_argument('-n',dest='num_atoms', type=int, default = 3, help = 'Number of atoms in molecule')
-parser.add_argument('-n_d',dest='num_disc', type=int, default = 3, help = 'Number of voxels on each axis')
-args = parser.parse_args()
+#parser = argparse.ArgumentParser(description = 'Molecular Dynamics Residence Time')
+#parser.add_argument('data_file', type = str, help = 'Traj file')
+#parser.add_argument('-N',dest='num_mol', type=int, default = 100, help = 'Number of molecules in box')
+#parser.add_argument('-n',dest='num_atoms', type=int, default = 3, help = 'Number of atoms in molecule')
+#parser.add_argument('-n_d',dest='num_disc', type=int, default = 3, help = 'Number of voxels on each axis')
+#args = parser.parse_args()
 
-def main(argv):
+#def main(argv):
 
-	array_of_tuples=[(x,args.num_mol,args.num_atoms,args.num_disc) for x in args.data_file.split()]
+#        array_of_tuples=[(x,args.num_mol,args.num_atoms,args.num_disc) for x in args.data_file.split()]
 	
-	#par_fun(args.data_file,args.num_mol,args.num_atoms,args.num_disc) 
-	with Pool(mp.cpu_count()) as p:
-		result = p.starmap(par_fun,array_of_tuples)
+#        with open('test.out','w') as f:
+#                f.write('Start\n\n')
 
-	return args.data_file.split(), result  ##(result will have a set (ordered voxel_list, diffusion score))
+	#par_fun(args.data_file,args.num_mol,args.num_atoms,args.num_disc) 
+#        with Pool(mp.cpu_count()) as p:
+#                result = p.starmap(par_fun,array_of_tuples)
+
+#        with open('test.out','a') as f:
+#                f.write('{}\n'.format(result))
+        
+#        return args.data_file.split(), result  ##(result will have a set (ordered voxel_list, diffusion score))
 
 def par_fun(traj_file,num_mol,num_atoms,num_disc):
 
@@ -40,8 +46,8 @@ def par_fun(traj_file,num_mol,num_atoms,num_disc):
 	voxel,dif_score = get_diff_time(voxel_map_all)
 
 	fn = traj_file.split('/')[-1].split('.')[0]
-	traj_anim(traj_all,args.num_atoms,box_dims,outname=f'traj_{fn}.gif')
-	plot_bar(dif_score,voxel,fig_name=f'dif_t_{fn}.png',xlabel='diffusion time (unit timestep)',ylabel='voxel')
+	#traj_anim(traj_all,args.num_atoms,box_dims,outname=f'traj_{fn}.gif')
+	#plot_bar(dif_score,voxel,fig_name=f'dif_t_{fn}.png',xlabel='diffusion time (unit timestep)',ylabel='voxel')
 
 	return (voxel,dif_score)
 
@@ -85,7 +91,7 @@ def map_voxel(traj_all, voxels, box_dims,num_atoms):
 		#create com
 		com = [] 
 		for i in list(divide_chunks(traj,num_atoms)):   
-			molecule = np.array([[float(_) for count_,_ in enumerate(x.rstrip().split()) if count_ in [2,3,4]] for x in i])
+			molecule = np.array([[float(_) for count_,_ in enumerate(x.rstrip().split()) if count_ in [3,4,5]] for x in i])
 			com += [np.mean(molecule,axis=0)]
 
 		#account for outside voxel
@@ -227,5 +233,5 @@ def traj_anim(traj_all,num_atoms,box_dims,outname='traj.gif'):
 
 	return
 
-if __name__ == '__main__':
-    main(sys.argv[1:])
+#if __name__ == '__main__':
+#    main(sys.argv[1:])

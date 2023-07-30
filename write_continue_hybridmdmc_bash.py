@@ -7,11 +7,13 @@
 
 import os,argparse,sys,datetime
 import pandas as pd
+import numpy as np
+from hybrid_mdmc.parsers import parse_concentration
 
 
 # Main function
 def main(argv):
-    """Write the bash file for initializing and running a new hybridmdmc Toy Problem.
+    """Write the bash file for continuing a hybridmdmc Toy Problem.
     """
 
     # Create the parser
@@ -24,11 +26,8 @@ def main(argv):
     parser.add_argument(dest='replicate', type=str,
                         help='Replicate (str).')
 
-    parser.add_argument(dest='molecule_types', type=str,
-                        help='String list of molecule types.')
-
-    parser.add_argument(dest='molecule_counts', type=str,
-                        help='String list of molecule counts.')
+    parser.add_argument(dest='steps', type=int,
+                        help='Number of steps.')
 
     # Optional arguments
     parser.add_argument('-parameters', dest='parameters', type=str, default='InitializeParameters.xlsx',
@@ -43,8 +42,8 @@ def main(argv):
     parser.add_argument('-cores', dest='cores', type=int, default=16,
                         help='Number of cores on which to run (int). Defualt: 16')
 
-    parser.add_argument('-timelim', dest='timelim', type=str, default='06:00:00',
-                        help='Time limit of run (str). Default: 03:00:00')
+    parser.add_argument('-timelim', dest='timelim', type=str, default='04:00:00',
+                        help='Time limit of run (str). Default: 04:00:00')
 
     parser.add_argument('-voxels', dest='voxels', type=str, default='6 6 6',
                         help='String of voxel delineations. Default: 6 6 6')
@@ -74,8 +73,12 @@ def main(argv):
         print('Exiting...')
         return
 
-    # Write the bash file
+    # Determine the next step number
     run = args.system + '-' + args.replicate
+    counts,times,rxns = parse_concentration('{}.concentration'.format(run))
+    begin = 1 + np.sum([1 for diffusion in counts.keys() for _ in counts[diffusion].keys()])
+
+    # Write the bash file
     with open(run+'.sh', 'w') as f:
         f.write(
             "#!/bin/bash\n"+\
@@ -116,27 +119,8 @@ def main(argv):
             "# Run script\n"+\
             "echo \"Start time: $(date)\"\n"+\
             "\n"+\
-            "rm ${prefix}.concentration\n"+\
-            "rm ${prefix}.scale\n"+\
-            "\n"+\
-            "# System prep\n"+\
-            "python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc.py ${system}"+\
-            " {} \'{}\' \'{}\' -msf {}.msf -header {}.header\n".format(args.replicate,args.molecule_types,args.molecule_counts,args.system,args.system)+\
-            "mpirun -np {} ".format(args.cores)+\
-            "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
-            "cp ${prefix}.in.init           ${prefix}_prep.in.init\n"+\
-            "cp ${prefix}.in.data           ${prefix}_prep.in.data\n"+\
-            "cp ${prefix}.end.data          ${prefix}_prep.end.data\n"+\
-            "cp ${prefix}.lammps.out        ${prefix}_prep.lammps.out\n"+\
-            "cp ${prefix}.lammps.log        ${prefix}_prep.lammps.log\n"+\
-            "cp ${prefix}.thermo.avg        ${prefix}_prep.thermp.avg\n"+\
-            "cp ${prefix}.relax.lammpstrj   ${prefix}_prep.relax.lammpstrj\n"+\
-            "cp ${prefix}.density.lammpstrj ${prefix}_prep.density.lammpstrj\n"+\
-            "cp ${prefix}.heat.lammpstrj    ${prefix}_prep.heat.lammpstrj\n"+\
-            "cp ${prefix}.equil.lammpstrj   ${prefix}_prep.equil.lammpstrj\n"+\
-            "\n"+\
             "# Reactive loop\n"+\
-            "for i in `seq 0 20000`;do\n"+\
+            "for i in `seq {} {}`;do\n".format(begin,begin+args.steps)+\
             "\n"+\
             "    # Run RMD script\n"+\
             "    python3 ~/bin/hybrid_mdmc/write_diffusion.py ${prefix}.end.data -prefix ${prefix} -num_voxels "+\

@@ -3,9 +3,8 @@
 #    Dylan Gilley
 #    dgilley@purdue.edu 
 
-import os,argparse,sys,datetime,pipes,json
+import os,argparse,sys,datetime
 import numpy as np
-import pandas as pd
 from scipy.spatial.distance import *
 from copy import deepcopy
 from hybrid_mdmc.classes import *
@@ -91,34 +90,34 @@ def main(argv):
                         help='Maximum (less than or equal to) standard deviation of the rolling mean of the number fraction of a molecular species'+\
                         'for that number fraction to be considered stagnant.')
 
-    parser.add_argument('-scalingcriteria_rollingmean_cycles', dest='scalingcriteria_rollingmean_cycles', default=3,
+    parser.add_argument('-scalingcriteria_rollingmean_cycles', dest='scalingcriteria_rollingmean_cycles', type=int, default=3,
                         help='Minimum (greater than or equal to) number of MDMC cycles that a species number fraction must be stagnant for reactions involving that species to be scaled.')
 
-    parser.add_argument('-scalingcriteria_concentration_slope', dest='scalingcriteria_concentration_slope', default=0.1,
+    parser.add_argument('-scalingcriteria_concentration_slope', dest='scalingcriteria_concentration_slope', type=float, default=0.1,
                         help='Maximum (less than or equal to) slope of the number fraction of a molecular species for that number fraction to be considered stagnant.')
 
-    parser.add_argument('-scalingcriteria_concentration_cycles', dest='scalingcriteria_concentration_cycles', default=1,
+    parser.add_argument('-scalingcriteria_concentration_cycles', dest='scalingcriteria_concentration_cycles', type=int, default=1,
                         help='Minimum (greater than or equal to) number of MDMC cycles that a species number fraction must be stagnant for reactions involving that species to be scaled.')
 
-    parser.add_argument('-scalingcriteria_rxnselection_count', dest='scalingcriteria_rxnselection_count', default=1,
+    parser.add_argument('-scalingcriteria_rxnselection_count', dest='scalingcriteria_rxnselection_count', type=int, default=1,
                         help='Minimum number of times (greater than or equal to) that a reaciton must be selected in the previous _ steps in order ot be a candidate for scaling.')
 
-    parser.add_argument('-windowsize_rollingmean', dest='windowsize_rollingmean', default=3,
+    parser.add_argument('-windowsize_rollingmean', dest='windowsize_rollingmean', type=int, default=3,
                         help='Window size for the calculation of the rolling mean, measured in MDMC cycles.')
 
-    parser.add_argument('-windowsize_slope', dest='windowsize_slope', default=5,
+    parser.add_argument('-windowsize_slope', dest='windowsize_slope', type=int, default=5,
                         help='Window size for the calculation of the slope of concentration, measured in MDMC cycles.')
 
-    parser.add_argument('-windowsize_scalingpause', dest='windowsize_scalingpause', default=3,
+    parser.add_argument('-windowsize_scalingpause', dest='windowsize_scalingpause', type=int, default=3,
                         help='Number of MDMC cycles after a reaciton is scaled or unscaled before it can be scaled again.')
 
-    parser.add_argument('-windowsize_rxnselection', dest='windowsize_rxnselection', default=10,
+    parser.add_argument('-windowsize_rxnselection', dest='windowsize_rxnselection', type=int, default=10,
                         help='Window size for checking the number of times a reaction has been selected.')
 
-    parser.add_argument('-scalingfactor_adjuster', dest='scalingfactor_adjuster', default=0.1,
+    parser.add_argument('-scalingfactor_adjuster', dest='scalingfactor_adjuster', type=float, default=0.1,
                         help='Quantity which a reaction rate is multiplied by to scale that rate.')
 
-    parser.add_argument('-scalingfactor_minimum', dest='scalingfactor_minimum', default=1e-6,
+    parser.add_argument('-scalingfactor_minimum', dest='scalingfactor_minimum', type=float, default=1e-6,
                         help='Minimum reaction rate scaling factor for all reactions.')
 
     parser.add_argument('-charged_atoms', dest='charged_atoms', type=bool, default=True,
@@ -135,7 +134,7 @@ def main(argv):
 
     # Parse the data_file, diffusion_file, rxndf, and msf files
     atoms,bonds,angles,dihedrals,impropers,box,adj_mat,extra_prop = parse_data_file(args.data_file,unwrap=True)
-    voxels,diffusion_matrix = parse_diffusion(args.diffusion_file)
+    # voxels,diffusion_matrix = parse_diffusion(args.diffusion_file)
     rxndata = parse_rxndf(args.rxndf)
     masterspecies = parse_msf(args.msf)
     data_header = parse_header(args.header)
@@ -143,6 +142,9 @@ def main(argv):
 
     if args.debug:
         breakpoint()
+
+    # Create the voxels
+
 
     # Calculate the raw reaction rate for each reaction
     for r in rxndata.keys():
@@ -231,6 +233,7 @@ def main(argv):
         
         # If scaling is requested, unscale and scale the reactions
         vox_list = sorted(list(set(molecules.voxels)))
+        #vox_list = ?
         rxns_byvoxel = {vox:[] for vox in vox_list}
         if args.scalerates:
             PSSrxns = get_PSSrxns(
@@ -407,12 +410,12 @@ def adjust_arguments(args):
     if args.scale_file == 'default':
         args.scale_file = args.prefix+'.scale'
 
-    args.scalingcriteria_rollingmean_cycles = int(float(args.scalingcriteria_rollingmean_cycles))
+    args.scalingcriteria_rollingmean_cycles = int(float(arg.scalingcriteria_rollingmean_cycles))
     args.scalingcriteria_concentration_slope = float(args.scalingcriteria_concentration_slope)
     args.scalingcriteria_concentration_cycles = int(float(args.scalingcriteria_concentration_cycles))
     args.scalingcriteria_rxnselection_count = int(float(args.scalingcriteria_rxnselection_count))
 
-    args.windowsize_rollingmean = int(float(args.windowsize_rollingmean))
+    args.windowsize_rollingmean = int(float(args.windowszie_rollingmean))
     args.windowsize_slope = int(float(args.windowsize_slope))
     args.windowsize_scalingpause = int(float(args.windowsize_scalingpause))
     args.windowsize_rxnselection = int(float(args.windowsize_rxnselection))
