@@ -7,12 +7,13 @@ import os,argparse,sys,datetime
 import numpy as np
 from scipy.spatial.distance import *
 from copy import deepcopy
-from hybrid_mdmc.classes import *
+from hybrid_mdmc.Development.classes import *
 from hybrid_mdmc.parsers import *
-from hybrid_mdmc.functions import *
+from hybrid_mdmc.Development.functions import *
 from hybrid_mdmc.kmc import *
 from hybrid_mdmc.data_file_parser import parse_data_file
 from hybrid_mdmc.lammps_files_classes import write_lammps_data,write_lammps_init
+from hybrid_mdmc.Development.customargparse import HMDMC_ArgumentParser
 
 # Main argument
 def main(argv):
@@ -20,117 +21,14 @@ def main(argv):
     """
 
     # Create the parser.
-    parser = argparse.ArgumentParser(description='Conducts hybrid MD/MC simulation.')
+    parser = HMDMC_ArgumentParser(description='Conducts hybrid MD/MC simulation.')
+    parser.HMDMC_parse_args()
+    parser.adjust_default_args()
+    args = parser.args
 
-    # Positional arguments
-    parser.add_argument(dest='data_file', type=str,
-                        help='Name of the LAMMPS data file to read in.')
-
-    parser.add_argument(dest='diffusion_file', type=str,
-                        help='Name of the diffusion file to read in.')
-
-    # Optional arguments - files
-    parser.add_argument('-prefix', dest='prefix', type=str, default='default',
-                        help='Prefix of the rxndf file, msf file, and all output files. Prefix can be overridden for individual files. Default: data_file prefix')
-
-    parser.add_argument('-conc_file', dest='conc_file', type=str, default='default',
-                        help='Name of the concentration file. If not provided, the prefix is prepended to \.concentration"')
-
-    parser.add_argument('-log_file', dest='log_file', type=str, default='default',
-                        help='Name of the log file. If not provided, the prefix is prepended to ".log"')
-
-    parser.add_argument('-scale_file', dest='scale_file', type=str, default='default',
-                        help='Name of the scale file. If not provided, the prefix is prepended to ".log"')
-
-    parser.add_argument('-settings', dest='settings', type=str, default='default',
-                        help='Name of the settings file for LAMMPS MD run. If not provided, the prefix is preprended to ".in.settings"')
-
-    parser.add_argument('-write_data', dest='write_data', type=str, default='default',
-                        help='Name of the data file to write for LAMMPS MD run. If not provided, the prefix is preprended ".in.data"')
-
-    parser.add_argument('-write_init', dest='write_init', type=str, default='default',
-                        help='Name of the init file to write for LAMMPS MD run. If not provided, the prefix is preprended ".in.init"')
-
-    parser.add_argument('-header', dest='header', type=str, default='default',
-                        help='Name of the data header file. If not provided, the rpefix is prepended to ".header"')
-
-    parser.add_argument('-rxndf', dest='rxndf', type=str, default='default',
-                        help='Name of the rxndf file. If not provided, the prefix is preprended to ".rxndf"')
-
-    parser.add_argument('-msf', dest='msf', type=str, default='default',
-                        help='Name of the msf file. If not provided, the prefix is preprended to ".msf"')
-
-    # Optional arguments - Diffusion information
-    parser.add_argument('-temp', dest='temp', type=float, default=298.0,
-                        help='Temperature of the simulation (K). Default: 298.0 K')
-
-    parser.add_argument('-relax', dest='relax', type=float, default=1.0e3,
-                        help='Length of the relaxation nve/lim run. Default: 1.0e3 (fs)')
-
-    parser.add_argument('-diffusion', dest='diffusion', type=float, default=1.0e4,
-                        help='Length of the diffusion npt run. Default: 1.0e4 (fs)')
-
-    # Optional arguments - KMC parameters
-    parser.add_argument('-change_threshold', dest='change_threshold', type=float, default=0.10,
-                        help='Fraction of original molecules to react before this reactive KMC cycle completes.')
-
-    parser.add_argument('-diffusion_cutoff', dest='diffusion_cutoff', type=float, default=0.4,
-                        help='Minimum diffusion coefficient to consider for possible reaction between voxels.')
-
-    parser.add_argument('-kmc_type', dest='kmc_type', type=str, default='rejection_free',
-                        help='Type of KMC to perform in each voxel.')
-
-    parser.add_argument('-diffusion_step', dest='diffusion_step', type=int, default=0,
-                        help='Diffusion step. Default: 0.')
-
-    parser.add_argument('-scalerates', dest='scalerates', type=str, default='cumulative',
-                        help='Option for scaling reaction rates when species mole fractions go stagnant. Options: cumulative, static, off.')
-
-    parser.add_argument('-scalingcriteria_rollingmean_stddev', dest='scalingcriteria_rollingmean_stddev', type=float, default=0.1,
-                        help='Maximum (less than or equal to) standard deviation of the rolling mean of the number fraction of a molecular species'+\
-                        'for that number fraction to be considered stagnant.')
-
-    parser.add_argument('-scalingcriteria_rollingmean_cycles', dest='scalingcriteria_rollingmean_cycles', type=int, default=3,
-                        help='Minimum (greater than or equal to) number of MDMC cycles that a species number fraction must be stagnant for reactions involving that species to be scaled.')
-
-    parser.add_argument('-scalingcriteria_concentration_slope', dest='scalingcriteria_concentration_slope', type=float, default=0.1,
-                        help='Maximum (less than or equal to) slope of the number fraction of a molecular species for that number fraction to be considered stagnant.')
-
-    parser.add_argument('-scalingcriteria_concentration_cycles', dest='scalingcriteria_concentration_cycles', type=int, default=1,
-                        help='Minimum (greater than or equal to) number of MDMC cycles that a species number fraction must be stagnant for reactions involving that species to be scaled.')
-
-    parser.add_argument('-scalingcriteria_rxnselection_count', dest='scalingcriteria_rxnselection_count', type=int, default=1,
-                        help='Minimum number of times (greater than or equal to) that a reaciton must be selected in the previous _ steps in order ot be a candidate for scaling.')
-
-    parser.add_argument('-windowsize_rollingmean', dest='windowsize_rollingmean', type=int, default=3,
-                        help='Window size for the calculation of the rolling mean, measured in MDMC cycles.')
-
-    parser.add_argument('-windowsize_slope', dest='windowsize_slope', type=int, default=5,
-                        help='Window size for the calculation of the slope of concentration, measured in MDMC cycles.')
-
-    parser.add_argument('-windowsize_scalingpause', dest='windowsize_scalingpause', type=int, default=3,
-                        help='Number of MDMC cycles after a reaciton is scaled or unscaled before it can be scaled again.')
-
-    parser.add_argument('-windowsize_rxnselection', dest='windowsize_rxnselection', type=int, default=10,
-                        help='Window size for checking the number of times a reaction has been selected.')
-
-    parser.add_argument('-scalingfactor_adjuster', dest='scalingfactor_adjuster', type=float, default=0.1,
-                        help='Quantity which a reaction rate is multiplied by to scale that rate.')
-
-    parser.add_argument('-scalingfactor_minimum', dest='scalingfactor_minimum', type=float, default=1e-6,
-                        help='Minimum reaction rate scaling factor for all reactions.')
-
-    parser.add_argument('-charged_atoms', dest='charged_atoms', type=bool, default=True,
-                       help='If True, atoms have charges. If False, atoms are treated as LJ particles and written without charges.')
-
-    # Optional arguments - flags
-    parser.add_argument('--debug', dest='debug', default=False, action='store_const', const=True)
-
-    parser.add_argument('--log', dest='log', default=False, action='store_const', const=True)
-
-    # Parse the command line arguments.
-    args = parser.parse_args()
-    args = adjust_arguments(args)
+    for k,v in args.__dict__.items():
+        print(k,v,type(v))
+    return
 
     # Parse the data_file, diffusion_file, rxndf, and msf files
     atoms,bonds,angles,dihedrals,impropers,box,adj_mat,extra_prop = parse_data_file(args.data_file,unwrap=True)
@@ -378,52 +276,6 @@ def main(argv):
     write_lammps_init(init,args.write_init,step_restarts=False,final_restart=False,final_data=True)
 
     return
-
-
-def adjust_arguments(args):
-
-    if args.prefix == 'default':
-        args.prefix = args.data_file
-        if args.data_file.endswith('.in.data'):
-            args.prefix = args.data_file[:-8]
-        elif args.data_file.endswith('.end.data'):
-            args.prefix = args.data_file[:-9]
-        elif args.data_file.endswith('.data'):
-            args.prefix = args.data_file[:-5]
-
-    if args.rxndf == 'default':
-        args.rxndf = args.prefix+'.rxndf'
-    if args.msf == 'default':
-        args.msf = args.prefix+'.msf'
-    if args.settings == 'default':
-        args.settings = args.prefix+'.in.settings'
-    if args.header == 'default':
-        args.header = args.prefix+'.header'
-    if args.write_data == 'default':
-        args.write_data = args.prefix+'.in.data'
-    if args.write_init == 'default':
-        args.write_init = args.prefix+'.in.init'
-    if args.conc_file == 'default':
-        args.conc_file = args.prefix+'.concentration'
-    if args.log_file == 'default':
-        args.log_file = args.prefix+'.log'
-    if args.scale_file == 'default':
-        args.scale_file = args.prefix+'.scale'
-
-    args.scalingcriteria_rollingmean_cycles = int(float(arg.scalingcriteria_rollingmean_cycles))
-    args.scalingcriteria_concentration_slope = float(args.scalingcriteria_concentration_slope)
-    args.scalingcriteria_concentration_cycles = int(float(args.scalingcriteria_concentration_cycles))
-    args.scalingcriteria_rxnselection_count = int(float(args.scalingcriteria_rxnselection_count))
-
-    args.windowsize_rollingmean = int(float(args.windowszie_rollingmean))
-    args.windowsize_slope = int(float(args.windowsize_slope))
-    args.windowsize_scalingpause = int(float(args.windowsize_scalingpause))
-    args.windowsize_rxnselection = int(float(args.windowsize_rxnselection))
-
-    args.scalingfactor_adjuster = float(args.scalingfactor_adjuster)
-    args.scalingfactor_minimum = float(args.scalingfactor_minimum)
-
-    return args
 
 
 if __name__ == '__main__':
