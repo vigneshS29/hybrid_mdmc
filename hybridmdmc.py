@@ -3,7 +3,7 @@
 #    Dylan Gilley
 #    dgilley@purdue.edu 
 
-import os,argparse,sys,datetime,pipes,json
+import os,argparse,sys,datetime
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import *
@@ -158,7 +158,6 @@ def main(argv):
     for k,v in masterspecies.items():
         atomtypes2moltype[tuple(sorted([i[2] for i in v['Atoms']]))] = k
     molecules = gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz)
-    molID2molidx = {i:idx for idx,i in enumerate(molecules.ids)}
 
     # Check for consistency among the tracking files
     tfs = [ os.path.exists(f) for fidx,f in enumerate([args.conc_file,args.scale_file,args.log_file]) if [True,args.scalerates,args.log][fidx] ]
@@ -234,15 +233,23 @@ def main(argv):
         rxns_byvoxel = {vox:[] for vox in vox_list}
         if args.scalerates:
             PSSrxns = get_PSSrxns(
-                rxndata,rxnmatrix,rxnscaling,progression,
-                args.windowsize_slope,args.windowsize_scalingpause,
-                args.scalingcriteria_concentration_slope,args.scalingcriteria_concentration_cycles)
-            rxnscaling = ratescaling_unscalerxns(rxnmatrix,rxnscaling,progression,PSSrxns,cycle=progression.index[-1])
-            rxnscaling = ratescaling_scalerxns(
-                rxndata,rxnmatrix,rxnscaling,progression,PSSrxns,
-                args.scalingcriteria_rxnselection_count,
-                args.windowsize_scalingpause,args.windowsize_rxnselection,
-                args.scalingfactor_adjuster,args.scalingfactor_minimum)
+                rxnmatrix,
+                progression,
+                args.windowsize_slope,
+                args.windowsize_rxnselection,
+                args.scalingcriteria_concentration_slope,
+                args.scalingcriteria_concentration_cycles,
+                args.scalingcriteria_rxnselection_count
+            )
+            rxnscaling = scalerxns(
+                rxnscaling,
+                progression,
+                PSSrxns,
+                args.windowsize_scalingpause,
+                args.scalingfactor_adjuster,
+                args.scalingfactor_minimum,
+                rxnlist='all',
+            )
 
         if args.debug:
             breakpoint()
@@ -316,7 +323,6 @@ def main(argv):
 
         # Create new molecules object
         molecules = gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz)
-        molID2molidx = {i:idx for idx,i in enumerate(molecules.ids)}
 
         # Update the progression objects, if rate scaling is being performed
         if args.scalerates:

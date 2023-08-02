@@ -177,7 +177,7 @@ def parse_header(header_file):
 
             fields = line.split()
             if fields == []: continue
-            if fields[0] == '#': conitnue
+            if fields[0] == '#': continue
             if fields[0] == 'Masses':
                 flag = 'Masses'
                 continue
