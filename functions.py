@@ -778,14 +778,19 @@ def get_cyclesofconstantrollingmean(progression,column,windowsize_rollingmean,sc
     return np.argwhere(stddev_rollingmean_reverse > scalingcriteria_rollingmean_stddev)[0][0]
 
 
-def get_cyclesofconstantslope(progression,column,windowsize_slope,scalingcriteria_concentration_slope):
+def get_cyclesofconstantslope(progression,column,windowsize_slope,scalingcriteria_concentration_slope,steps=1e99):
 
     # If the progression dataframe has no length, return a value of 0.
-    if len(progression) == 0:
+    if len(progression) == 0 or len(progression) < windowsize_slope:
         return 0
 
+    # Adust the steps
+    steps += windowsize_slope
+    if steps > len(progression):
+        steps = len(progression)
+
     # Create an array holding the concentration, in reverse order.
-    concentration_reverse = np.array(progression.loc[:,column][::-1])
+    concentration_reverse = np.array(progression.loc[:,column][-steps:][::-1])
 
     # Calculate the absolute value of the slopes using the provided
     # window size, in reverse order.
@@ -798,7 +803,7 @@ def get_cyclesofconstantslope(progression,column,windowsize_slope,scalingcriteri
     # concentration_reverse - windowsize_slope + 1. Not catching this
     # results in an error in the next step.
     if np.all(slope_reverse <= scalingcriteria_concentration_slope):
-        return len(concentration_reverse) - windowsize_slope + 1
+        return len(slope_reverse)
 
     # Otherwise, return the index of the first instance where the
     # slope of the reverse concentraiton does NOT satisfy
