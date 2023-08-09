@@ -4,7 +4,10 @@
 #   dgilley@purdue.edu
 
 import numpy as np
-from diffusion import *
+from hybrid_mdmc.Development.functions import *
+from hybrid_mdmc.Development.calc_voxels import *
+from hybrid_mdmc.parsers import *
+
 
 transitions_matrix = np.array([
     [ 0, 10,  4,  0,  0,  0,  9],
