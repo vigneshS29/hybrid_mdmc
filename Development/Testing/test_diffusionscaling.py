@@ -4,7 +4,7 @@
 #    dgilley@purdue.edu
 
 import numpy as np
-
+from hybrid_mdmc.Development.diffusion import *
 
 # start by running everything with non-development functions, etc.
 # if they crash, look at difference bewteen non-development and development functions, etc.
@@ -24,7 +24,7 @@ import numpy as np
 # .msf
 
 
-#%% Test diffusion.py
+#%%
 
 transitions_matrix = np.array([
     [ 0, 10,  4,  0,  0,  0,  9],
@@ -37,5 +37,9 @@ transitions_matrix = np.array([
 ])
 dt = 10
 transitionrate_matrix = transitions_matrix/dt
+
+
+
+
 
 diffusionrate_matrix = get_diffusionratematrix_from_transitionratematrix(transitionrate_matrix)
