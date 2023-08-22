@@ -7,9 +7,9 @@ import os,argparse,sys,datetime
 import numpy as np
 from scipy.spatial.distance import *
 from copy import deepcopy
-from hybrid_mdmc.classes import *
+from hybrid_mdmc.Development.classes import *
 from hybrid_mdmc.parsers import *
-from hybrid_mdmc.functions import *
+from hybrid_mdmc.Development.functions import *
 from hybrid_mdmc.kmc import *
 from hybrid_mdmc.data_file_parser import parse_data_file
 from hybrid_mdmc.lammps_files_classes import write_lammps_data,write_lammps_init
@@ -20,13 +20,13 @@ def main(argv):
     """Driver for conducting Hybrid MDMC simulation.
     """
 
-    # Use HMDMC_ArgumentParser to parse the command line
+    # Create the parser.
     parser = HMDMC_ArgumentParser(description='Conducts hybrid MD/MC simulation.')
     parser.HMDMC_parse_args()
     parser.adjust_default_args()
     args = parser.args
 
-    # Read in the data_file, diffusion_file, rxndf, and msf files
+    # Parse the data_file, diffusion_file, rxndf, and msf files
     atoms,bonds,angles,dihedrals,impropers,box,adj_mat,extra_prop = parse_data_file(args.data_file,unwrap=True)
     # voxels,diffusion_matrix = parse_diffusion(args.diffusion_file)
     rxndata = parse_rxndf(args.rxndf)
@@ -36,6 +36,9 @@ def main(argv):
 
     if args.debug:
         breakpoint()
+
+    # Create the voxels
+
 
     # Calculate the raw reaction rate for each reaction
     for r in rxndata.keys():
@@ -51,6 +54,7 @@ def main(argv):
     for k,v in masterspecies.items():
         atomtypes2moltype[tuple(sorted([i[2] for i in v['Atoms']]))] = k
     molecules = gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz)
+    molID2molidx = {i:idx for idx,i in enumerate(molecules.ids)}
 
     # Check for consistency among the tracking files
     tfs = [ os.path.exists(f) for fidx,f in enumerate([args.conc_file,args.scale_file,args.log_file]) if [True,args.scalerates,args.log][fidx] ]
@@ -123,26 +127,19 @@ def main(argv):
         
         # If scaling is requested, unscale and scale the reactions
         vox_list = sorted(list(set(molecules.voxels)))
+        #vox_list = ?
         rxns_byvoxel = {vox:[] for vox in vox_list}
         if args.scalerates:
             PSSrxns = get_PSSrxns(
-                rxnmatrix,
-                progression,
-                args.windowsize_slope,
-                args.windowsize_rxnselection,
-                args.scalingcriteria_concentration_slope,
-                args.scalingcriteria_concentration_cycles,
-                args.scalingcriteria_rxnselection_count
-            )
-            rxnscaling = scalerxns(
-                rxnscaling,
-                progression,
-                PSSrxns,
-                args.windowsize_scalingpause,
-                args.scalingfactor_adjuster,
-                args.scalingfactor_minimum,
-                rxnlist='all',
-            )
+                rxndata,rxnmatrix,rxnscaling,progression,
+                args.windowsize_slope,args.windowsize_scalingpause,
+                args.scalingcriteria_concentration_slope,args.scalingcriteria_concentration_cycles)
+            rxnscaling = ratescaling_unscalerxns(rxnmatrix,rxnscaling,progression,PSSrxns,cycle=progression.index[-1])
+            rxnscaling = ratescaling_scalerxns(
+                rxndata,rxnmatrix,rxnscaling,progression,PSSrxns,
+                args.scalingcriteria_rxnselection_count,
+                args.windowsize_scalingpause,args.windowsize_rxnselection,
+                args.scalingfactor_adjuster,args.scalingfactor_minimum)
 
         if args.debug:
             breakpoint()
@@ -216,6 +213,7 @@ def main(argv):
 
         # Create new molecules object
         molecules = gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz)
+        molID2molidx = {i:idx for idx,i in enumerate(molecules.ids)}
 
         # Update the progression objects, if rate scaling is being performed
         if args.scalerates:

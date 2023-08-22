@@ -26,3 +26,14 @@ def calc_voxels(num_voxels,box,xbounds=[],ybounds=[],zbounds=[]):
                 count += 1
 
     return voxels
+
+
+def get_box_fromvoxels(voxels):
+    box = [
+        [
+            np.min([voxels[_]['bounds'][didx][0] for _ in voxels.keys()]),
+            np.max([voxels[_]['bounds'][didx][1] for _ in voxels.keys()])
+        ]
+        for didx in range(3)
+    ]
+    return box

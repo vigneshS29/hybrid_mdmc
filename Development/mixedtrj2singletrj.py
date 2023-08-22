@@ -3,11 +3,7 @@
 #    Dylan M. Gilley
 #    dgilley@purdue.edu
 
-import os,argparse,sys,datetime
-import numpy as np
-import pandas as pd
-from copy import deepcopy
-from mol_classes import AtomList,IntraModeList
+import argparse,sys
 from hybrid_mdmc.data_file_parser import parse_data_file
 from hybrid_mdmc.frame_generator import frame_generator
 from hybrid_mdmc.parsers import parse_msf
@@ -45,9 +41,15 @@ def main(argv):
     if args.msf_file == 'default':
         args.msf_file = prefix + '.msf'
 
+    mixedtrj2singletrj(prefix,args.lammps_data_file,args.msf_file,args.trj_file,args.start,args.end,args.every)
+
+    return
+
+def mixedtrj2singletrj(prefix,lammps_data_file,msf_file,trj_file,start,end,every):
+
     # Read in the LAMMPS data file and master species file (.msf).
-    atoms,bonds,angles,dihedrals,impropers,box,adj_mat,extra_prop = parse_data_file(args.lammps_data_file)
-    species_data = parse_msf(args.msf_file)
+    atoms,bonds,angles,dihedrals,impropers,box,adj_mat,extra_prop = parse_data_file(lammps_data_file)
+    species_data = parse_msf(msf_file)
 
     # Create one dictionary to map atom ID to molecule type,
     # and another to map molecule type to all atom IDs in molecules of that type.
@@ -65,11 +67,8 @@ def main(argv):
             f.write('')
 
     # Loop through the trj file using frame_generator.
-    for atoms,timestep,box,prop in frame_generator(args.trj_file,start=args.start,end=args.end,every=args.every,unwrap=False,return_prop=True):
+    for atoms,timestep,box,prop in frame_generator(trj_file,start,end,every,unwrap=False,return_prop=True):
         for species in species_data.keys():
-            #temp_atoms = deepcopy(atoms)
-            #deletion_idxs = temp_atoms.get_idx(ids=[_ for _ in temp_atoms.ids if _ not in species2atomIDs[species]])
-            #temp_atoms.del_idx(idx=deletion_idxs,reassign_ids=False,reassign_lammps_type=False)
             indices = sorted([index for index,_ in enumerate(atoms.ids) if _ in species2atomIDs[species]])
             with open(prefix+'_{}.lammpstrj'.format(species),'a') as f:
                 f.write('ITEM: TIMESTEP\n{}\n'.format(timestep))
@@ -78,7 +77,7 @@ def main(argv):
                 f.write('ITEM: ATOMS {}\n'.format(' '.join(sorted(list(prop.keys())))))
                 for idx in indices:
                     f.write('{}\n'.format(' '.join([str(prop[_][idx]) for _ in sorted(list(prop.keys()))])))
-    
+
     return
 
 

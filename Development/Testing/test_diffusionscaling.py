@@ -1,13 +1,30 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Author
-#   Dylan M Gilley
-#   dgilley@purdue.edu
+#    Dylan Gilley
+#    dgilley@purdue.edu
 
 import numpy as np
-from hybrid_mdmc.Development.functions import *
-from hybrid_mdmc.Development.calc_voxels import *
-from hybrid_mdmc.parsers import *
 
+
+# start by running everything with non-development functions, etc.
+# if they crash, look at difference bewteen non-development and development functions, etc.
+# then assimilate
+
+#%% System
+
+# Species: A, A2, A2B, B
+
+# Ten of each molecule, 40 total molecules, 60 total atoms
+# 27 total voxels
+# Ten frames
+
+# Required files:
+# .lammpstrj
+# .end.data
+# .msf
+
+
+#%% Test diffusion.py
 
 transitions_matrix = np.array([
     [ 0, 10,  4,  0,  0,  0,  9],
