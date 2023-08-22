@@ -5,6 +5,8 @@
 
 import numpy as np
 from collections import defaultdict
+from hybrid_mdmc.frame_generator import frame_generator
+from hybrid_mdmc.classes import MoleculeList
 
 # ToDo
 #   - catch error where there is no path between two voxels (may already be handled)
