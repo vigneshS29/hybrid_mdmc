@@ -182,7 +182,10 @@ def calc_diffusionrate(
         atoms_datafile,
         box,
         masterspecies_info,
-        num_voxels):
+        num_voxels,
+        xbounds=[],
+        ybounds=[],
+        zbounds=[]):
     """
     """
     # Calculate the voxels and voxel mapping objects based on the
@@ -192,7 +195,12 @@ def calc_diffusionrate(
     # the molecules_datafile object can be created with the already
     # existing gen_molecules function. The voxel assignments of
     # molecules_datafile are not used anywhere in this function. 
-    voxels = calc_voxels(num_voxels, box)
+    voxels = calc_voxels(
+        num_voxels,box,
+        xbounds=xbounds,
+        ybounds=ybounds,
+        zbounds=zbounds
+    )
     voxelsmap, voxelsx, voxelsy, voxelsz = voxels2voxelsmap(voxels)
     atomtypes2moltype = {
         tuple(sorted([_[2] for _ in v['Atoms']])): k

@@ -118,7 +118,7 @@ def gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz):
         voxels=[molecules_dict[m]['voxel'] for m in mkeys])
 
 
-def get_rxns(molecules,vox,voxelID2idx,diffusion_matrix,delete,rxn_data,diffusion_cutoff,temp):
+def get_rxns(molecules,vox,voxelID2idx,diffusion_rates,rxnscaling,delete,rxn_data,diffusion_cutoff,temp):
     """Creates instance of class hybridmdmc.classes.ReactionList.
 
     Parameters
@@ -159,10 +159,22 @@ def get_rxns(molecules,vox,voxelID2idx,diffusion_matrix,delete,rxn_data,diffusio
     -------
     rxns: instance of class HybridMDMC_Classes.ReactionList
     """
+    # The total reaction rate is calculated as follows:
+    # timeofdiffusion = 1 / diffusionrate
+    #   diffusionrate is the rate of diffusion from voxel i to voxel j
+    #   for bimolecular rxns, where the first reactant is in voxel i
+    #   and the second is in voxel j
+    # timeofrxn = 1 / (rawrxnrate * rxnscaling)
+    # totalrxnrate = 1 / (timeofdiffusion + timeofrxn)
+    #
+    # It is assumed that if diffusion/reaction scaling is NOT
+    # requested, all diffusion rates are np.inf/all reaction scalings
+    # are 1.
 
-    molID2idx = {ID:idx for idx,ID in enumerate(molecules.ids)} # Create dictionary to map molecule IDs to their index in the molecules object
+    molID2idx = {_:idx for idx,_ in enumerate(molecules.ids)} # Create dictionary to map molecule IDs to their index in the molecules object
     rmol_IDs = sorted([ molecules.ids[idx] for idx in range(len(molecules.ids)) if molecules.voxels[idx] == vox ]) # Get molecule IDs for the reactive species
     rxns,rxn_count = {},1
+    cycle = rxnscaling.index[-1]
 
     for rxn_type in rxn_data.keys(): # Loop over every possible reaction in the rxn_data
         for rmID in rmol_IDs: # Loop over each reactive molecule in the voxel
@@ -173,26 +185,29 @@ def get_rxns(molecules,vox,voxelID2idx,diffusion_matrix,delete,rxn_data,diffusio
 
             # Unimolecular rxn
             if len(reactant_types) == 0:
+                timeofdiffusion = 0
+                timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
                 rxns[rxn_count] = {
                     'rxn_type': rxn_type,
                     'reactants': [rmID],
-                    'rate': rxn_data[rxn_type]['A'][0]*temp**rxn_data[rxn_type]['b'][0]*np.exp(-rxn_data[rxn_type]['Ea'][0]/temp/0.00198588)}
+                    'rate': 1 / (timeofdiffusion + timeofrxn)}
                 rxn_count += 1
                 continue
 
             # Bimolecular rxn
             if len(reactant_types) == 1:
-                partner_IDs = [ID for ID in molecules.ids
-                               if diffusion_matrix[voxelID2idx[vox],voxelID2idx[molecules.voxels[molID2idx[ID]]]] >= diffusion_cutoff
-                               and molecules.mol_types[molID2idx[ID]] == reactant_types[0]
+                partner_IDs = [_ for _ in molecules.ids
+                               if diffusion_rates[molecules.mol_types[molID2idx[rmID]]][voxelID2idx[vox],voxelID2idx[molecules.voxels[molID2idx[_]]]] >= diffusion_cutoff
+                               and molecules.mol_types[molID2idx[_]] == reactant_types[0]
                                #and ID not in delete
-                               and ID != rmID]
+                               and _ != rmID]
                 for pID in partner_IDs:
+                    timeofdiffusion = 1 / (diffusion_rates[molecules.mol_types[molID2idx[rmID]]][voxelID2idx[vox],voxelID2idx[molecules.voxels[molID2idx[pID]]]])
+                    timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
                     rxns[rxn_count] = {
                         'rxn_type': rxn_type,
                         'reactants': [rmID,pID],
-                        'rate': rxn_data[rxn_type]['A'][0]*temp**rxn_data[rxn_type]['b'][0]*np.exp(-rxn_data[rxn_type]['Ea'][0]/temp/0.00198588)
-                        *diffusion_matrix[voxelID2idx[vox],voxelID2idx[molecules.voxels[molID2idx[pID]]]]}
+                        'rate': 1 / (timeofdiffusion + timeofrxn)}
                     rxn_count += 1
                 continue
 

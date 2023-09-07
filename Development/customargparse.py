@@ -1,4 +1,4 @@
-#!/uar/bin/env python3
+#!/usr/bin/env python3
 # Author
 #   Dylan M Gilley
 #   dgilley@purdue.edu
@@ -20,8 +20,10 @@ class HMDMC_ArgumentParser(ArgumentParser):
         # Optional arguments - files
         self.add_argument('-prefix', dest='prefix', type=str, default='default',
                             help='Prefix of the rxndf file, msf file, and all output files. Prefix can be overridden for individual files. Default: data_file prefix')
+        self.add_argument('-trj_file', dest='trj_file', type=str, default='default',
+                            help='Name of the lammps trajectory file. If not provided, the prefix is prepended to ".lammpstrj"')
         self.add_argument('-conc_file', dest='conc_file', type=str, default='default',
-                            help='Name of the concentration file. If not provided, the prefix is prepended to \.concentration"')
+                            help='Name of the concentration file. If not provided, the prefix is prepended to ".concentration"')
         self.add_argument('-log_file', dest='log_file', type=str, default='default',
                             help='Name of the log file. If not provided, the prefix is prepended to ".log"')
         self.add_argument('-scale_file', dest='scale_file', type=str, default='default',
@@ -39,13 +41,23 @@ class HMDMC_ArgumentParser(ArgumentParser):
         self.add_argument('-msf', dest='msf', type=str, default='default',
                             help='Name of the msf file. If not provided, the prefix is preprended to ".msf"')
 
-        # Optional arguments - Diffusion information
+        # Optional arguments - MD information
         self.add_argument('-temp', dest='temp', default=298.0,
                             help='Temperature of the simulation (K). Default: 298.0 K')
         self.add_argument('-relax', dest='relax', default=1.0e3,
                             help='Length of the relaxation nve/lim run. Default: 1.0e3 (fs)')
         self.add_argument('-diffusion', dest='diffusion', default=1.0e4,
                             help='Length of the diffusion npt run. Default: 1.0e4 (fs)')
+        
+        # Optional arguments - diffusion information
+        self.add_argument('-num_voxels', dest='num_voxels', type=str, default='3 3 3',
+                            help='Space delimited string of the number of voxels in the x, y, and z directions. Default: 3 3 3')
+        self.add_argument('-x_bounds', dest='x_bounds', type=str, default='',
+                            help='Space delimited string defining custom bounds for the x-axis. Overrides first entry in -num_voxels')
+        self.add_argument('-y_bounds', dest='y_bounds', type=str, default='',
+                            help='Space delimited string defining custom bounds for the y-axis. Overrides second entry in -num_voxels')
+        self.add_argument('-z_bounds', dest='z_bounds', type=str, default='',
+                            help='Space delimited string defining custom bounds for the z-axis. Overrides third entry in -num_voxels')
 
         # Optional arguments - KMC parameters
         self.add_argument('-change_threshold', dest='change_threshold', default=0.10,
@@ -86,6 +98,8 @@ class HMDMC_ArgumentParser(ArgumentParser):
         self.set_defaults(charged_atoms=True)
 
         # Optional arguments - flags
+        self.add_argument('--distance_criteria', dest='distance_criteria', default=False, action='store_const', const=True)
+        self.add_argument('--well_mixed', dest='well_mixed', default=False, action='store_const', const=True)
         self.add_argument('--debug', dest='debug', default=False, action='store_const', const=True)
         self.add_argument('--log', dest='log', default=False, action='store_const', const=True)
 
@@ -117,6 +131,8 @@ class HMDMC_ArgumentParser(ArgumentParser):
             self.args.write_data = self.args.prefix+'.in.data'
         if self.args.write_init == 'default':
             self.args.write_init = self.args.prefix+'.in.init'
+        if self.args.trj_file == 'default':
+            self.args.trj_file = self.args.prefix+'.lammpstrj'
         if self.args.conc_file == 'default':
             self.args.conc_file = self.args.prefix+'.concentration'
         if self.args.log_file == 'default':
@@ -124,10 +140,16 @@ class HMDMC_ArgumentParser(ArgumentParser):
         if self.args.scale_file == 'default':
             self.args.scale_file = self.args.prefix+'.scale'
 
-        # Handle diffusion information
+        # Handle MD information
         self.args.temp = float(self.args.temp)
         self.args.relax = float(self.args.relax)
         self.args.diffusion = float(self.args.diffusion)
+
+        # Handle diffusion information
+        self.args.num_voxels = [int(float(_)) for _ in self.args.num_voxels.split()]
+        self.args.x_bounds = [int(float(_)) for _ in self.args.x_bounds.split()]
+        self.args.y_bounds = [int(float(_)) for _ in self.args.y_bounds.split()]
+        self.args.z_bounds = [int(float(_)) for _ in self.args.z_bounds.split()]
 
         # Handle KMC parameters
         self.args.change_threshold = float(self.args.change_threshold)
@@ -150,7 +172,7 @@ class HMDMC_ArgumentParser(ArgumentParser):
         # Check that all arguments were appropriately handled
         if len(self.args.__dict__) != num_starting_args:
             print('Error! The number of arguments changed during argument adjustment.'+\
-                '\nPlease check customargparse.HMDMC_ArgumentParser.adjust_default_args() for typos, etc.'+\
+                '\nPlease check hybrid_mdmc.customargparse.HMDMC_ArgumentParser.adjust_default_args()'+\
                 '\nExiting...')
             self.args = None
             quit()

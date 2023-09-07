@@ -32,3 +32,12 @@
 > add OPTIONAL reaction scaling when calculating Rmax; it currently forces the use of reaction scaling
   - this should crash if reaction scaling is not being performed
   - make it look like line 276
+
+
+
+
+
+~ hybridmdmc
+  - make rxndata a class
+  - write the diffusion rate information to a file
+  - track how the diffusion rate changes with MD time to check convergence
