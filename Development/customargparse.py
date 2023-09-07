@@ -27,7 +27,7 @@ class HMDMC_ArgumentParser(ArgumentParser):
         self.add_argument('-log_file', dest='log_file', type=str, default='default',
                             help='Name of the log file. If not provided, the prefix is prepended to ".log"')
         self.add_argument('-scale_file', dest='scale_file', type=str, default='default',
-                            help='Name of the scale file. If not provided, the prefix is prepended to ".log"')
+                            help='Name of the scale file. If not provided, the prefix is prepended to ".scale"')
         self.add_argument('-settings', dest='settings', type=str, default='default',
                             help='Name of the settings file for LAMMPS MD run. If not provided, the prefix is preprended to ".in.settings"')
         self.add_argument('-write_data', dest='write_data', type=str, default='default',

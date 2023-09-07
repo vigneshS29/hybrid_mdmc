@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-#
 # Author
 #   Dylan M. Gilley
 #   dgilley@purdue.edu
 
 
-import os,argparse,sys,datetime
+import argparse,sys
 import pandas as pd
 
 
