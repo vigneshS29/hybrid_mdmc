@@ -2,6 +2,7 @@
 # Author: Lin (lin1209@purdue.edu)
 import sys,argparse,subprocess,os,time,math,shutil
 from matplotlib import pyplot as plt
+from copy import deepcopy
 import numpy as np
 from mol_classes import AtomList
 
@@ -75,7 +76,7 @@ def frame_generator(name,start=0,end=-1,every=1,unwrap=False,adj_list=None,retur
     # attributes that are supported by lammps and AtomList
     # key: lammps keyword, value: AtomList attribute
     candidates = {'id':'ids','mol':'mol_id','type':'lammps_type','mass':'mass','q':'charge',\
-   'x':'x','y':'y','z':'z','vx':'vx','vy':'vy','vz':'vz','fx':'fx','fy':'fy','fz':'fz'}
+   'xu':'x','yu':'y','zu':'z','x':'x','y':'y','z':'z','vx':'vx','vy':'vy','vz':'vz','fx':'fx','fy':'fy','fz':'fz'}
 
     # Parse Trajectories
     frame       = -1                                                  # Frame counter (total number of frames in the trajectory)
@@ -186,8 +187,8 @@ def frame_generator(name,start=0,end=-1,every=1,unwrap=False,adj_list=None,retur
                         atom = AtomList(ids=prop['id'])
                         for _ in prop:
                            if _ in list(candidates.keys()):
-                              atom.__dict__[_] = prop[_] 
-                        
+                              atom.__dict__[candidates[_]] = prop[_] 
+
                         # Upwrap the geometry
                         if unwrap is True:
                             atom = unwrap_atomlist(atom,adj_list,box)
@@ -248,8 +249,7 @@ def unwrap_geo(geo,adj_list,box):
              for j in unwrap:
  
                  # new holds the index in geo_final of bonded atoms to j that need to be unwrapped
-                 new = [ k for k in adj_list[j] if k not in unwrapped ] 
-                 
+                 new = [ k for k in adj_list[j] if k not in unwrapped ]                 
 
                  # unwrap the new atoms
                  for k in new:

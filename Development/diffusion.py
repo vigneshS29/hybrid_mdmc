@@ -7,15 +7,45 @@ import numpy as np
 from collections import defaultdict
 from hybrid_mdmc.frame_generator import frame_generator
 from hybrid_mdmc.classes import MoleculeList
+from hybrid_mdmc.Development.calc_voxels import calc_voxels
+from hybrid_mdmc.functions import *
+from hybrid_mdmc.parsers import *
+from hybrid_mdmc.data_file_parser import *
 
 # ToDo
-#   - catch error where there is no path between two voxels (may already be handled)
 #   - documentation
-#   - parallelize; get_diffusionratematrix_from_transitionratematrix performs MANY
-#     independent calculations. Parallel handling would provide tremendous speedup.
+#   - rewrite using a voxel class
+#   - parallelize; get_diffusionratematrix_from_transitionratematrix
+#     performs MANY independent calculations. Parallelization would
+#     provide tremendous speed-up.
+#   - check that frame_generator will behave appropriately if it
+#     attempts to unwrap trajectories that are provided unwrapped
 
 
 class DiffusionGraph():
+    """Class designed to hold diffusion information.
+
+    This class creates objects used for finding diffusion rates
+    with Dijsktra's Algorithm.
+
+    Attributes
+    ----------
+    edges: dictionary
+        keys - int
+            node ID
+        values - list of int
+            node IDs to which the key node ID connects
+    weights: dictionary
+        keys - tuple (int,int)
+            (starting nodeID, ending nodeID)
+        value - float
+            "weight" (rate, time, etc.) connecting the nodes
+
+    Methods
+    -------
+    add_edge(from_node,to_node,weight)
+    """
+
     def __init__(self, edges=defaultdict(list), weights={}):
         self.edges = edges
         self.weights = weights
@@ -24,129 +54,205 @@ class DiffusionGraph():
         self.edges[from_node].append(to_node)
         self.weights[(from_node, to_node)] = weight
 
+    def dijkstra(self, initial, end):
+        # shortest paths is a dict of nodes
+        # whose value is a tuple of (previous node, weight)
+        shortest_paths = {initial: (None, 0)}
+        current_node = initial
+        visited = set()
+        while current_node != end:
+            visited.add(current_node)
+            destinations = self.edges[current_node]
+            weight_to_current_node = shortest_paths[current_node][1]
+            for next_node in destinations:
+                weight = self.weights[(current_node, next_node)
+                                      ] + weight_to_current_node
+                if next_node not in shortest_paths:
+                    shortest_paths[next_node] = (current_node, weight)
+                else:
+                    current_shortest_weight = shortest_paths[next_node][1]
+                    if current_shortest_weight > weight:
+                        shortest_paths[next_node] = (current_node, weight)
+            next_destinations = {
+                node: shortest_paths[node]
+                for node in shortest_paths if node not in visited
+            }
+            if not next_destinations:
+                return None, np.inf
+                # next node is the destination with the lowest weight
+            current_node = min(next_destinations,
+                               key=lambda k: next_destinations[k][1])
+        # Work back through destinations in shortest path
+        path = []
+        while current_node is not None:
+            path.append(current_node)
+            next_node = shortest_paths[current_node][0]
+            current_node = next_node
+        # Reverse path
+        path = path[::-1]
+        total_weight = np.sum(
+            [self.weights[(path[idx], path[idx+1])]
+                for idx in range(len(path)-1)
+             ]
+        )
+        return path, total_weight
 
-def get_timegraph_from_ratematrix(ratematrix):
-    timegraph = DiffusionGraph(
+
+def get_DiffusionGraph_from_matrix(matrix):
+    """Calculates a DiffusionGraph object from a matrix.
+
+    Given a square matrix containing some sort of weight between nodes,
+    this function returns an instance of "DiffusionGraph." Node IDs are
+    assigned as the row/column index. Weight values are the
+    corresponding matrix values.
+    """
+    graph = DiffusionGraph(
         edges={
             idx: [
-                col for col, _ in enumerate(ratematrix[idx, :]) if _]
-            for idx in range(len(ratematrix))
+                col for col, _ in enumerate(matrix[idx, :]) if _]
+            for idx in range(len(matrix))
         },
         weights={
-            (ridx, cidx): 1/val
-            for ridx, row in enumerate(ratematrix) for cidx, val in enumerate(row) if val
+            (ridx, cidx): val
+            for ridx, row in enumerate(matrix) for cidx, val in enumerate(row) if val
         })
-    return timegraph
+    return graph
 
 
-def dijsktra(graph, initial, end):
-    # shortest paths is a dict of nodes
-    # whose value is a tuple of (previous node, weight)
-    shortest_paths = {initial: (None, 0)}
-    current_node = initial
-    visited = set()
-    while current_node != end:
-        visited.add(current_node)
-        destinations = graph.edges[current_node]
-        weight_to_current_node = shortest_paths[current_node][1]
-        for next_node in destinations:
-            weight = graph.weights[(current_node, next_node)
-                                   ] + weight_to_current_node
-            if next_node not in shortest_paths:
-                shortest_paths[next_node] = (current_node, weight)
-            else:
-                current_shortest_weight = shortest_paths[next_node][1]
-                if current_shortest_weight > weight:
-                    shortest_paths[next_node] = (current_node, weight)
-        next_destinations = {
-            node: shortest_paths[node] for node in shortest_paths if node not in visited}
-        if not next_destinations:
-            return None
-            # next node is the destination with the lowest weight
-        current_node = min(next_destinations,
-                           key=lambda k: next_destinations[k][1])
-    # Work back through destinations in shortest path
-    path = []
-    while current_node is not None:
-        path.append(current_node)
-        next_node = shortest_paths[current_node][0]
-        current_node = next_node
-    # Reverse path
-    path = path[::-1]
-    return path
-
-
-def get_diffusiontime_with_dijkstra(time_graph, initial, end):
-    path = dijsktra(time_graph, initial, end)
-    if not path:
-        return [1e99]
-    return [time_graph.weights[(path[idx], path[idx+1])] for idx in range(len(path)-1)]
-
-
-def get_diffusionratematrix_from_transitionratematrix(transitionrate_matrix):
-    transitiontime_graph = get_timegraph_from_ratematrix(transitionrate_matrix)
-    diffusionratematrix = np.zeros(
-        (len(transitiontime_graph.edges), len(transitiontime_graph.edges)))
-    for ridx in range(len(diffusionratematrix)):
-        for cidx in range(len(diffusionratematrix)):
-            if ridx == cidx:
-                diffusionratematrix[ridx, cidx] = 1e99
-                continue
-            diffusionratematrix[ridx, cidx] = 1/np.sum(
-                get_diffusiontime_with_dijkstra(transitiontime_graph, ridx, cidx))
-    return diffusionratematrix
-
-
-def calc_neighbor_diffusionrate(traj_file,datafile_molecules,voxels,msf):
-
-    # Create a voxelID2idx map
-    # This could be passed in as an argument, but it is cheap to recreate and simplifies things to recreate it as needed
-    # Creating a voxel class would simplify the whole algorithm; this map could be included in the class
-    voxelID2idx = {k:idx for idx,k in enumerate(sorted(list(voxels.keys())))}
-
-    # Create a dictionary to hold the voxel number of each molecule for each frame.
-    # The entries are a list of voxels, indexed to datafile_molecules.ids
+def get_voxels_byframe(traj_file, atoms_datafile, molecules_datafile, num_voxels):
+    """
+    """
+    # Create a dictionary to hold the voxel number of each molecule for
+    # each frame. Entries are a list of voxels, indexed to
+    # molecules_datafile.ids, and keys are the timestep.
     voxels_byframe = {}
 
-    # Loop over all of the requested frames in the trajectory
-    for frame_atoms,timestep,box in frame_generator(
-            traj_file,start=0,end=-1,every=1,unwrap=True,adj_list=datafile_molecules.atom_ids,return_prop=False):
+    # Calculate an adjacency list for use in frame_generator using the
+    # datefile_atoms object. This is required for unwrapping atom
+    # trajectories.
+    adj_list = [
+        [idx for idx, _ in enumerate(
+            atoms_datafile.mol_id) if idx != aidx and _ == mol]
+        for aidx, mol in enumerate(atoms_datafile.mol_id)
+    ]
 
-        # Create a temporary MoleculeList instance to hold the molecule information
+    # Loop over all of the requested frames.
+    for frame_atoms, timestep, box in frame_generator(
+            traj_file,
+            start=0, end=-1, every=1, unwrap=True,
+            adj_list=adj_list,
+            return_prop=False):
+
+        # Calculate the voxels object based on the this timestep's box
+        # and the requested "num_voxels."
+        voxels = calc_voxels(num_voxels, box)
+
+        # Create a temporary MoleculeList object to hold the molecule
+        # information for this timestep. By using the unchanging
+        # molecules_datafile object to assign ids, all temporary
+        # molecule objects and subsequent voxel lists will be
+        # consistently indexed.
         molecules_thisframe = MoleculeList(
-            ids=datafile_molecules.ids,
-            mol_types=datafile_molecules.mol_types,
-            atom_ids=datafile_molecules.atom_ids
+            ids=molecules_datafile.ids,
+            mol_types=molecules_datafile.mol_types,
+            atom_ids=molecules_datafile.atom_ids
         )
 
-        # Calculate the COG and voxel of each molecule
-        molecules_thisframe.calc_cog(frame_atoms)
+        # Calculate the COG and voxel for each molecule in this
+        # timestep. frame_generator unwraps trajectories (if they are
+        # not already provided unwrapped). The COG is calculated
+        # using unwrapped atomic positions, then is wrapped back into
+        # the box so that the molecule is assigned to the correct
+        # voxel.
+        molecules_thisframe.get_cog(frame_atoms, box=box)
         molecules_thisframe.get_voxels(voxels)
 
-        # Add the timestep: voxel_list entry to the voxels_byframe dictionary for this frame
-        voxels_byframe[timestep] = molecules_thisframe.voxels
+        # Add the voxel list for this timestep to the voxels_byframe
+        # dictionary. Entries in the list of assigned voxels are voxel
+        # IDs as created with calc_voxels; calc_voxels assigns IDs as
+        # the index of voxels, counted as (x0,y0,z0,), ... (x0,y0,zf),
+        # (x0,y1,z0), ... (x0,yf,zf), (x1,y0,z0), ... (xf,yf,zf).
+        voxels_byframe[int(timestep)] = molecules_thisframe.voxels
 
-    # Create the dictionary that will hold an array for each species time
-    # Each array will eventually hold the diffusion rate for the species traveling From voxel "i" TO voxel "j"
-    # in element row i, column j.
-    # The diffusion "rate" is (number of occurences) / (time)
-    neighbor_diffusionrates = {species:np.zeros(len(voxels),len(voxels)) for species in msf.keys()}
-    
-    # Create a sorted list of the timesteps
+    return voxels_byframe
+
+
+def calc_diffusionrate(
+        trjfile,
+        atoms_datafile,
+        box,
+        masterspecies_info,
+        num_voxels):
+    """
+    """
+    # Calculate the voxels and voxel mapping objects based on the
+    # provided number of voxels and the provided box. The actual voxel
+    # parameters are not used. They are only created to provide a
+    # consistent len(voxel) used throughout the function, and so that
+    # the molecules_datafile object can be created with the already
+    # existing gen_molecules function. The voxel assignments of
+    # molecules_datafile are not used anywhere in this function. 
+    voxels = calc_voxels(num_voxels, box)
+    voxelsmap, voxelsx, voxelsy, voxelsz = voxels2voxelsmap(voxels)
+    atomtypes2moltype = {
+        tuple(sorted([_[2] for _ in v['Atoms']])): k
+        for k, v in masterspecies_info.items()
+    }
+
+    # Generate a molecule object based on the datafile information.
+    molecules_datafile = gen_molecules(
+        atoms_datafile, atomtypes2moltype, voxelsmap, voxelsx, voxelsy, voxelsz)
+
+    # Calculate the assigned voxel for each molecule in each frame. The
+    # list of assigned voxels in each timestep consists of voxel IDs
+    # (which, as provided by calc_voxels, are equivalent to voxel
+    # indices).
+    voxels_byframe = get_voxels_byframe(
+        trjfile, atoms_datafile, molecules_datafile, num_voxels)
+
+    # For each species, create a "voxel transition" array. The ith,jth
+    # entry is the total number of transitions from voxel i to voxel j
+    # for that species over the entire trajectory. Arrays are held in a
+    # dictionary.
+    voxel_transitions = {
+        _: np.zeros((len(voxels), len(voxels)))
+        for _ in masterspecies_info.keys()
+    }
     timesteps = sorted(voxels_byframe.keys())
+    for midx, type_ in enumerate(molecules_datafile.mol_types):
+        voxel_list = np.array([voxels_byframe[time][midx]
+                               for time in timesteps])
+        voxel_list_shifted = np.roll(voxel_list, -1)
+        transitions = np.column_stack((voxel_list, voxel_list_shifted))
+        to_from, count = np.unique(
+            transitions[:-1, :], axis=0, return_counts=True)
+        for idx, tf in enumerate((to_from)):
+            voxel_transitions[type_][tf[0]-1, tf[1]-1] += count[idx]
 
-    # Loop over each molecule provided in the datafile_molecule object
-    for midx,moleculeID in enumerate(datafile_molecules.ids):
+    # Calculate a DiffusionGraph object for the diffusion rates, then
+    # create a DiffusionGraph object for the diffusion times. Creating
+    # the rates object first will make a smaller object by not
+    # including the transitions that have values of 0.
+    diffusion_rate = {
+        k: get_DiffusionGraph_from_matrix(v/(timesteps[-1] - timesteps[0]))
+        for k, v in voxel_transitions.items()
+    }
+    diffusion_time = {
+        k: DiffusionGraph(edges=v.edges, weights={
+                          kk: 1/vv for kk, vv in v.weights.items()})
+        for k, v in diffusion_rate.items()
+    }
 
-        # Loop through every timestep in the provided trajectory
-        for idx in range(1,len(timesteps)):
+    # Perform Dijkstra's on the diffusion time. This must be performed
+    # on the diffusion time and not the diffusion rate, because
+    # Dijkstra's finds the shortest path. Afterwards, the diffusion
+    # time is converted to diffusion rate.
+    diffusion_rate = {}
+    for k, v in diffusion_time.items():
+        diffusion_rate[k] = np.zeros((len(voxels), len(voxels)))
+        for row in range(len(voxels)):
+            for col in range(len(voxels)):
+                path, totaltime = v.dijkstra(row, col)
+                diffusion_rate[k][row, col] = 1/totaltime
 
-            # Add the voxel change to the approriate array that this molecule experienced for this step in the trajectory
-            neighbor_diffusionrates[ datafile_molecules.mol_types[midx] ][ voxelID2idx[voxels_byframe[timesteps[idx-1]][midx]], voxelID2idx[voxels_byframe[timesteps[idx]][midx]] ] += 1
-
-    # To go from a count of the number of occurances to the "rate," divide by the total time
-    for k,v in neighbor_diffusionrates.items():
-        neighbor_diffusionrates[k] /=  (timesteps[-1] - timesteps[0])
-
-    # Get the direct diffusion rate for each i-to-j voxel transition using Dijsktra's algorithm
-    
+    return diffusion_rate

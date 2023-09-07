@@ -99,13 +99,53 @@ class MoleculeList():
             self.ids=np.array([v for _, v in enumerate(self.ids) if _ not in idx])
         
 
-    def get_atomID2moleculeID():
+    def get_atomID2moleculeID(self):
         return {aID:self.ids[midx] for midx in range(len(self.ids)) for aID in self.atom_ids[midx]}
 
-    def calc_cog(atomslist,box=None):
+    def get_cog(self,atomslist,box=[]):
         self.cog = np.array([
             np.mean(np.array([[atomslist.x[idx],atomslist.y[idx],atomslist.z[idx]] for idx,ID in enumerate(atomslist.ids) if ID in matoms]),axis=0) for matoms in self.atom_ids
         ])
+        # Wrap back into the box, if it's provided
+        if len(box):
+            for d in range(3):
+                while not np.all(self.cog[:,d] >= box[d][0]):
+                    self.cog[:,d] = np.where(self.cog[:,d] >= box[d][0], self.cog[:,d], self.cog[:,d] + (box[d][1] - box[d][0]))
+                while not np.all(self.cog[:,d] <= box[d][1]):
+                    self.cog[:,d] = np.where(self.cog[:,d] <= box[d][1], self.cog[:,d], self.cog[:,d] - (box[d][1] - box[d][0]))
+
+    def get_voxels(self,voxels):
+        if not len(self.cog):
+            print('Error! Tried to assign voxels to {} before calculating cog.'.format(self))
+            return
+        
+        voxelsb = { tuple([tuple(i) for i in v]):k for k,v in voxels.items() }
+        x = sorted(set([ i for bounds in [v[0] for v in voxels.values()] for i in bounds  ]))
+        y = sorted(set([ i for bounds in [v[1] for v in voxels.values()] for i in bounds  ]))
+        z = sorted(set([ i for bounds in [v[2] for v in voxels.values()] for i in bounds  ]))
+        voxelsmap = {}
+        for i in range(len(x)-1):
+            for j in range(len(y)-1):
+                for k in range(len(z)-1):
+                    xx = [x[i],x[i+1]]
+                    yy = [y[j],y[j+1]]
+                    zz = [z[k],z[k+1]]
+                    voxelsmap[(i,j,k)] = [ voxelsb[(tuple(xx),tuple(yy),tuple(zz))],xx,yy,zz]
+                    if i == len(x)-2:
+                        voxelsmap[(i+1,j,k)] = [ voxelsb[(tuple(xx),tuple(yy),tuple(zz))],xx,yy,zz]
+                    if j == len(y)-2:
+                        voxelsmap[(i,j+1,k)] = [ voxelsb[(tuple(xx),tuple(yy),tuple(zz))],xx,yy,zz]
+                    if k == len(z)-2:
+                        voxelsmap[(i,j,k+1)] = [ voxelsb[(tuple(xx),tuple(yy),tuple(zz))],xx,yy,zz]
+        voxelsx,voxelsy,voxelsz = np.array(x),np.array(y),np.array(z)
+        self.voxels = np.array([
+            voxelsmap[(
+                np.argwhere(voxelsx<=cog[0])[-1][0], 
+                np.argwhere(voxelsy<=cog[1])[-1][0],
+                np.argwhere(voxelsz<=cog[2])[-1][0] )][0]
+            for cog in self.cog
+        ])
+
 
 
 class ReactionList():
