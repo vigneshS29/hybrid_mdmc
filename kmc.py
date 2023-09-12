@@ -117,7 +117,7 @@ def spkmc_rxn(rxns,rxn_data,molecules,Rmax,translate_distance=0.0):
     dt = -np.log(u2)/Rmax
     u1 = np.random.random()
     rates = deepcopy(rxns.rates)
-    rates = rates.tolist()
+    #rates = rates.tolist()
     rates.append(Rmax - np.sum(rates))
     rxn_idx = np.argwhere(np.cumsum(rates)>=np.sum(rates)*u1)[0][0]
     if rxn_idx == len(rates)-1:
