@@ -133,7 +133,7 @@ def main(argv):
         'dump2avg': 100,
         'coords_freq': 1000,
         'atom_style': 'molecular',
-        'run_name':     [          'relax',           'density',              'heat',             'equil'],
+        'run_name':     [          'relax',           'density',              'heat',         'diffusion'],
         'run_type':     [      'nve/limit',               'npt',               'npt',               'npt'],
         'run_steps':    [             1000,              100000,            10000000,            10000000],
         'run_temp':     [[10.0,10.0,100.0], [100.0,100.0,100.0], [100.0,300.0,100.0], [300.0,300.0,100.0]],

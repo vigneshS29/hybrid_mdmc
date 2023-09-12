@@ -42,6 +42,8 @@ class HMDMC_ArgumentParser(ArgumentParser):
                             help='Name of the msf file. If not provided, the prefix is preprended to ".msf"')
 
         # Optional arguments - MD information
+        self.add_argument('-atom_style', dest='atom_style', default='full',
+                            help='LAMMPS atom style. Default: full')
         self.add_argument('-temp', dest='temp', default=298.0,
                             help='Temperature of the simulation (K). Default: 298.0 K')
         self.add_argument('-relax', dest='relax', default=1.0e3,
