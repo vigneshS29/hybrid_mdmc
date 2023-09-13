@@ -5,7 +5,7 @@ LAMMPS data file.
 30    bonds
 2     bond types
 0     angles
-0     angle types
+1     angle types
 0     dihedrals
 0     dihedral types
 0     impropers

@@ -9,16 +9,13 @@ from scipy.spatial.distance import *
 from copy import deepcopy
 from hybrid_mdmc.data_file_parser import parse_data_file
 from hybrid_mdmc.lammps_files_classes import write_lammps_data, write_lammps_init
-from hybrid_mdmc.Development.customargparse import HMDMC_ArgumentParser
+from hybrid_mdmc.customargparse import HMDMC_ArgumentParser
 from hybrid_mdmc.classes import *
 from hybrid_mdmc.parsers import *
 from hybrid_mdmc.kmc import *
 from hybrid_mdmc.functions import *
-from hybrid_mdmc.Development.calc_voxels import *
-from hybrid_mdmc.Development.diffusion import *
-
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+from hybrid_mdmc.calc_voxels import *
+from hybrid_mdmc.diffusion import *
 
 # Main argument
 def main(argv):
