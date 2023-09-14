@@ -7,7 +7,7 @@ import numpy as np
 from collections import defaultdict
 from hybrid_mdmc.frame_generator import frame_generator
 from hybrid_mdmc.classes import MoleculeList
-from hybrid_mdmc.Development.calc_voxels import calc_voxels
+from hybrid_mdmc.calc_voxels import calc_voxels
 from hybrid_mdmc.functions import *
 from hybrid_mdmc.parsers import *
 from hybrid_mdmc.data_file_parser import *
