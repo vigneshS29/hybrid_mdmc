@@ -73,12 +73,12 @@ def main(argv):
     # Check for consistency among the tracking files.
     tfs = [
         os.path.exists(f)
-        for fidx, f in enumerate([args.conc_file, args.scale_file, args.log_file])
-        if [True, args.scalerates, args.log][fidx]
+        for fidx, f in enumerate([args.conc_file, args.scale_file, args.log_file, args.diffusion_file])
+        if [True, args.scalerates, args.log, True][fidx]
     ]
     if len(set(tfs)) != 1:
-        tf_names = [args.conc_file, args.scale_file, args.log_file]
-        tf_requested = [True, args.scalerates, args.log]
+        tf_names = [args.conc_file, args.scale_file, args.log_file, args.diffusion_file]
+        tf_requested = [True, args.scalerates, args.log, True]
         print('Error! Inconsistent exsitence of tracking files.')
         print('  File Name                Requested   Exists')
         for idx in range(len(tf_names)):
@@ -95,7 +95,8 @@ def main(argv):
     for f in [
         (True, args.conc_file),
         (args.scalerates, args.scale_file),
-        (args.log, args.log_file)
+        (args.log, args.log_file),
+        (True, args.diffusion_file)
     ]:
         if f[0]:
             lines, new = [], False
@@ -122,6 +123,8 @@ def main(argv):
                 ]
                 new = True
             if not os.path.exists(f[1]) and '.log' in f[1]:
+                new = True
+            if not os.path.exists(f[1]) and '.diffusion' in f[1]:
                 new = True
             write_tracking_file(
                 f[1], lines,
@@ -207,6 +210,13 @@ def main(argv):
             ybounds=args.y_bounds,
             zbounds=args.z_bounds
         )
+
+    # Append the diffusion file
+    with open(args.diffusion_file,'a') as f:
+        for k,v in sorted(diffusion_rate.items()):
+            f.write('\nDiffusion Rates for {}\n'.format(k))
+            for row in v:
+                f.write('{}\n'.format(' '.join([str(_) for _ in row])))
 
     # Begin the KMC loop
     molecount_starting, molecount_current = len(
