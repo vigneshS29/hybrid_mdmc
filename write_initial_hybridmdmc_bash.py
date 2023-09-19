@@ -19,34 +19,30 @@ def main(argv):
     # Positional argument(s)
     parser.add_argument(dest='system', type=str,
                         help='System name (str).')
-
-    parser.add_argument(dest='replicate', type=str,
-                        help='Replicate (str).')
-
+    parser.add_argument(dest='prefix', type=str,
+                        help='Prefix (str).')
     parser.add_argument(dest='molecule_types', type=str,
                         help='String list of molecule types.')
-
     parser.add_argument(dest='molecule_counts', type=str,
                         help='String list of molecule counts.')
 
     # Optional arguments
     parser.add_argument('-parameters', dest='parameters', type=str, default='InitializeParameters.xlsx',
                          help='Name of the parameters excel file (str). Default: InitializeParameters.xlsx')
-
     parser.add_argument('-queue', dest='queue', type=str, default='bsavoie',
                         help='Queue on which to run (str). Defualt: bsavoie')
-
     parser.add_argument('-nodes', dest='nodes', type=int, default=1,
                        help='Number of nodes on which to run (int). Default: 1')
-
     parser.add_argument('-cores', dest='cores', type=int, default=16,
                         help='Number of cores on which to run (int). Defualt: 16')
-
     parser.add_argument('-timelim', dest='timelim', type=str, default='06:00:00',
                         help='Time limit of run (str). Default: 03:00:00')
-
-    parser.add_argument('-voxels', dest='voxels', type=str, default='6 6 6',
+    parser.add_argument('-num_voxels', dest='num_voxels', type=str, default='6 6 6',
                         help='String of voxel delineations. Default: 6 6 6')
+    parser.add_argument('-diffusivesteps', dest='diffusivesteps', type=str, default='20000',
+                        help='Number of diffusive steps to run.')
+    parser.add_argument('-atom_style', dest='atom_style', type=str, default='full',
+                        help='LAMMPS atom style. Default: full')
 
     # Parse the line arguments
     args = parser.parse_args()
@@ -74,24 +70,25 @@ def main(argv):
         return
 
     # Write the bash file
-    run = args.system + '-' + args.replicate
-    with open(run+'.sh', 'w') as f:
+    with open(args.prefix+'.sh', 'w') as f:
         f.write(
             "#!/bin/bash\n"+\
             "#\n"+\
-            "#SBATCH --job-name {}\n".format(run)+\
-            "#SBATCH -o {}.slurm.out\n".format(run)+\
-            "#SBATCH -e {}.slurm.err\n".format(run)+\
+            "#SBATCH --job-name {}\n".format(args.prefix)+\
+            "#SBATCH -o {}.slurm.out\n".format(args.prefix)+\
+            "#SBATCH -e {}.slurm.err\n".format(args.prefix)+\
             "#SBATCH -A {}\n".format(args.queue)+\
             "#SBATCH -N {}\n".format(args.nodes)+\
             "#SBATCH -n {}\n".format(args.cores)+\
             "#SBATCH -t {}\n".format(args.timelim)+\
             "\n"+\
             "system=\"{}\"\n".format(args.system)+\
-            "prefix=\"{}\"\n".format(run))
+            "prefix=\"{}\"\n".format(args.prefix))
         for var in variables:
             f.write("{}=\"{}\"\n".format(var,parameters.loc[var,args.system]))
         f.write(
+
+
             "\n"+\
             "# Set environment variables\n"+\
             "export PATH=\"/depot/bsavoie/apps/openmpi/3.0.1/bin:$PATH\"\n"+\
@@ -115,12 +112,17 @@ def main(argv):
             "# Run script\n"+\
             "echo \"Start time: $(date)\"\n"+\
             "\n"+\
+            
             "rm ${prefix}.concentration\n"+\
             "rm ${prefix}.scale\n"+\
+            "rm ${prefix}.diffusion\n"+\
+            "rm ${prefix}.log\n"+\
+
             "\n"+\
             "# System prep\n"+\
-            "python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc.py ${system}"+\
-            " {} \'{}\' \'{}\' -msf {}.msf -header {}.header\n".format(args.replicate,args.molecule_types,args.molecule_counts,args.system,args.system)+\
+            "python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc.py ${system} ${prefix} "+\
+            "\'{}\' \'{}\' ".format(args.molecule_types,args.molecule_counts)+\
+            "-msf ${system}.msf -header ${system}.header\n"+\
             "mpirun -np {} ".format(args.cores)+\
             "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
             "cp ${prefix}.in.init           ${prefix}_prep.in.init\n"+\
@@ -135,20 +137,31 @@ def main(argv):
             "cp ${prefix}.equil.lammpstrj   ${prefix}_prep.equil.lammpstrj\n"+\
             "\n"+\
             "# Reactive loop\n"+\
-            "for i in `seq 0 20000`;do\n"+\
+            "for i in `seq 0 {}`;do\n".format(int(args.diffusivesteps))+\
             "\n"+\
             "    # Run RMD script\n"+\
-            "    python3 ~/bin/hybrid_mdmc/write_diffusion.py ${prefix}.end.data -prefix ${prefix} -num_voxels "+\
-            "'{}' --well_mixed\n".format(args.voxels)+\
-            "    python3 ~/bin/hybrid_mdmc/hybridmdmc.py ${prefix}.end.data ${prefix}.diffusion -prefix ${prefix} -diffusion_step ${i}\\\n"+\
+            "    python3 ~/bin/hybrid_mdmc/hybridmdmc.py ${prefix}.end.data -trj_file ${prefix}.diffusion.lammpstrj\\\n"+\
             "        -msf ${system}.msf -rxndf ${system}.rxndf -settings ${system}.in.settings -header ${system}.header\\\n"+\
-            "        -temp ${Temperature} -relax ${RelaxationTime} -diffusion ${DiffusionTime}\\\n"+\
-            "        -change_threshold ${ChangeThreshold} -diffusion_cutoff ${DiffusionCutoff} -kmc_type 'rejection_free' -scalerates 'cumulative'\\\n"+\
-            "        -scalingcriteria_concentration_slope ${Criteria_Slope} -scalingcriteria_concentration_cycles ${Criteria_Cycles}\\\n"+\
-            "        -scalingcriteria_rxnselection_count ${Criteria_RxnSelectionCount}\\\n"+\
-            "        -windowsize_slope ${Window_Slope} -windowsize_scalingpause ${Window_Pause} -windowsize_rxnselection ${Window_RxnSelection}\\\n"+\
-            "        -scalingfactor_adjuster ${Scaling_Adjuster} -scalingfactor_minimum ${Scaling_Minimum}\n"+\
-            "    \n"+\
+            "        -diffusion_step ${i}\\\n"+\
+            "        -prefix ${prefix}\\\n"+\
+            "        -temp ${Temperature}\\\n"+\
+            "        -relax ${RelaxationTime\\\n"+\
+            "        -diffusion ${DiffusionTime}\\\n"+\
+            "        -atom_style {}\\\n".format(args.atom_style)+\
+            "        -num_voxels {}\\\n".format(args.num_voxels)+\
+            "        -change_threshold ${ChangeThreshold}\\\n"+\
+            "        -diffusion_cutoff ${DiffusionCutoff}\\\n"+\
+            "        -scalerates 'cumulative'\\\n"+\
+            "        -scalingcriteria_concentration_slope ${Criteria_Slope} \\\n"+\
+            "        -scalingcriteria_concentration_cycles ${Criteria_Cycles} \\\n"+\
+            "        -scalingcriteria_rxnselection_count ${Criteria_RxnSelectionCount} \\\n"+ 
+            "        -windowsize_slope ${Window_Slope} \\\n"+\
+            "        -windowsize_scalingpause ${Window_Pause} \\\n"+\
+            "        -windowsize_rxnselection ${Window_RxnSelection} \\\n"+\
+            "        -scalingfactor_adjuster ${Scaling_Adjuster} \\\n"+\
+            "        -scalingfactor_minimum ${Scaling_Minimum} \\\n"+\
+            "        --no-charged_atoms\\n"+\
+            "    \n\n"+\
             "    # Run MD\n"+\
             "    mpirun -np {} ".format(args.cores)+\
                 "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\

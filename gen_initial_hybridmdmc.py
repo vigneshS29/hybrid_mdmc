@@ -19,7 +19,7 @@ def main(argv):
     # Positional arguments
     parser.add_argument(dest='system')
 
-    parser.add_argument(dest='replicate')
+    parser.add_argument(dest='prefix')
     
     parser.add_argument(dest='molecule_types')
 
@@ -40,7 +40,6 @@ def main(argv):
         args.msf = args.system + '.msf'
     if not args.header:
         args.header = args.system + '.header'
-    run = args.system + '-' + args.replicate
 
     # Read in the .msf and .header files
     msf = parse_msf(args.msf)
@@ -112,7 +111,7 @@ def main(argv):
 
     # Write the LAMMPS data file
     write_lammps_data(
-        run+'.in.data',
+        args.prefix+'.in.data',
         atoms,
         interaction_instances['Bonds'],
         interaction_instances['Angles'],
@@ -126,8 +125,8 @@ def main(argv):
     # Write the LAMMPS init file
     init = {
         'settings': '{}.in.settings'.format(args.system),
-        'prefix': run,
-        'data': run+'.in.data',
+        'prefix': args.prefix,
+        'data': args.prefix+'.in.data',
         'thermo_freq': 1000,
         'avg_freq': 1000,
         'dump2avg': 100,
@@ -149,7 +148,7 @@ def main(argv):
         'dihedral_style': 'opls',
         'improper_style': 'cvff'
     }
-    write_lammps_init(init,run+'.in.init',step_restarts=False,final_restart=False,final_data=True)
+    write_lammps_init(init,args.prefix+'.in.init',step_restarts=False,final_restart=False,final_data=True)
 
     return
 
