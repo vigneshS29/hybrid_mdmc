@@ -125,16 +125,16 @@ def main(argv):
             "-msf ${system}.msf -header ${system}.header\n"+\
             "mpirun -np {} ".format(args.cores)+\
             "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
-            "cp ${prefix}.in.init           ${prefix}_prep.in.init\n"+\
-            "cp ${prefix}.in.data           ${prefix}_prep.in.data\n"+\
-            "cp ${prefix}.end.data          ${prefix}_prep.end.data\n"+\
-            "cp ${prefix}.lammps.out        ${prefix}_prep.lammps.out\n"+\
-            "cp ${prefix}.lammps.log        ${prefix}_prep.lammps.log\n"+\
-            "cp ${prefix}.thermo.avg        ${prefix}_prep.thermp.avg\n"+\
-            "cp ${prefix}.relax.lammpstrj   ${prefix}_prep.relax.lammpstrj\n"+\
-            "cp ${prefix}.density.lammpstrj ${prefix}_prep.density.lammpstrj\n"+\
-            "cp ${prefix}.heat.lammpstrj    ${prefix}_prep.heat.lammpstrj\n"+\
-            "cp ${prefix}.equil.lammpstrj   ${prefix}_prep.equil.lammpstrj\n"+\
+            "cp ${prefix}.in.init               ${prefix}_prep.in.init\n"+\
+            "cp ${prefix}.in.data               ${prefix}_prep.in.data\n"+\
+            "cp ${prefix}.end.data              ${prefix}_prep.end.data\n"+\
+            "cp ${prefix}.lammps.out            ${prefix}_prep.lammps.out\n"+\
+            "cp ${prefix}.lammps.log            ${prefix}_prep.lammps.log\n"+\
+            "cp ${prefix}.thermo.avg            ${prefix}_prep.thermo.avg\n"+\
+            "cp ${prefix}.relax.lammpstrj       ${prefix}_prep.relax.lammpstrj\n"+\
+            "cp ${prefix}.density.lammpstrj     ${prefix}_prep.density.lammpstrj\n"+\
+            "cp ${prefix}.heat.lammpstrj        ${prefix}_prep.heat.lammpstrj\n"+\
+            "cp ${prefix}.diffusion.lammpstrj   ${prefix}_prep.diffusion.lammpstrj\n"+\
             "\n"+\
             "# Reactive loop\n"+\
             "for i in `seq 0 {}`;do\n".format(int(args.diffusivesteps))+\
@@ -145,10 +145,10 @@ def main(argv):
             "        -diffusion_step ${i}\\\n"+\
             "        -prefix ${prefix}\\\n"+\
             "        -temp ${Temperature}\\\n"+\
-            "        -relax ${RelaxationTime\\\n"+\
+            "        -relax ${RelaxationTime}\\\n"+\
             "        -diffusion ${DiffusionTime}\\\n"+\
             "        -atom_style {}\\\n".format(args.atom_style)+\
-            "        -num_voxels {}\\\n".format(args.num_voxels)+\
+            "        -num_voxels '{}'\\\n".format(args.num_voxels)+\
             "        -change_threshold ${ChangeThreshold}\\\n"+\
             "        -diffusion_cutoff ${DiffusionCutoff}\\\n"+\
             "        -scalerates 'cumulative'\\\n"+\
@@ -160,7 +160,7 @@ def main(argv):
             "        -windowsize_rxnselection ${Window_RxnSelection} \\\n"+\
             "        -scalingfactor_adjuster ${Scaling_Adjuster} \\\n"+\
             "        -scalingfactor_minimum ${Scaling_Minimum} \\\n"+\
-            "        --no-charged_atoms\\n"+\
+            "        --no-charged_atoms\\\n"+\
             "    \n\n"+\
             "    # Run MD\n"+\
             "    mpirun -np {} ".format(args.cores)+\
