@@ -372,12 +372,13 @@ def main(argv):
         'avg_freq': 1000,
         'dump4avg': 100,
         'coords_freq': 1000,
-        'run_name': ['relax', 'diffusion'],
-        'run_type': ['nve/limit', 'npt'],
-        'run_steps': [args.relax, args.diffusion],
-        'run_temp': [[args.temp, args.temp, 10.0], [args.temp, args.temp, 100.0]],
-        'run_press': [[1.0, 1.0, 100.0], [1.0, 1.0, 100.0]],
-        'run_timestep': [0.25, 1.0],
+        'units': args.lammps_units,
+        'run_name': ['relax', 'equil', 'diffusion'],
+        'run_type': ['nve/limit', 'npt', 'npt'],
+        'run_steps': [args.relax, args.diffusion*10, args.diffusion],
+        'run_temp': [[args.temp, args.temp, 10.0], [args.temp, args.temp, 100.0], [args.temp, args.temp, 100.0]],
+        'run_press': [[args.press, args.press, 100.0], [args.press, args.press, 100.0], [args.press, args.press, 100.0]],
+        'run_timestep': [0.25, 1.0, 1.0],
         'restart': False,
         'reset_steps': False,
         'thermo_keywords': ['temp', 'press', 'ke', 'pe']}
@@ -390,6 +391,8 @@ def main(argv):
     init['coords_freq'] = 20
     if not args.charged_atoms:
         init['atom_style'] = 'molecular'
+    if args.lammps_units == 'lj':
+        init['run_timestep'] = [0.001, 0.001, 0.001]
     write_lammps_data(args.write_data, atoms, bonds, angles, dihedrals,
                       impropers, box, header=data_header, charge=args.charged_atoms)
     write_lammps_init(init, args.write_init, step_restarts=False,

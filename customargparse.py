@@ -48,8 +48,12 @@ class HMDMC_ArgumentParser(ArgumentParser):
         # Optional arguments - MD information
         self.add_argument('-atom_style', dest='atom_style', default='full',
                             help='LAMMPS atom style. Default: full')
+        self.add_argument('-lammps_units', dest='lammps_units', default='real',
+                          help='LAMMPS units. Default: real')
         self.add_argument('-temp', dest='temp', default=298.0,
                             help='Temperature of the simulation (K). Default: 298.0 K')
+        self.add_argument('-press', dest='press', default=1.0,
+                            help='Pressure of the simulation (K). Default: 1.0')
         self.add_argument('-relax', dest='relax', default=1.0e3,
                             help='Length of the relaxation nve/lim run. Default: 1.0e3 (fs)')
         self.add_argument('-diffusion', dest='diffusion', default=1.0e4,
@@ -150,6 +154,7 @@ class HMDMC_ArgumentParser(ArgumentParser):
 
         # Handle MD information
         self.args.temp = float(self.args.temp)
+        self.args.press = float(self.args.press)
         self.args.relax = float(self.args.relax)
         self.args.diffusion = float(self.args.diffusion)
 

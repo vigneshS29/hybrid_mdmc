@@ -43,13 +43,15 @@ def main(argv):
                         help='Number of diffusive steps to run.')
     parser.add_argument('-atom_style', dest='atom_style', type=str, default='full',
                         help='LAMMPS atom style. Default: full')
+    parser.add_argument('-lammps_units', dest='lammps_units', type=str, default='real',
+                        help='LAMMPS units. Default: real')
 
     # Parse the line arguments
     args = parser.parse_args()
 
     # Create dataframe holding the hybridmdmc parameters for this system by reading the args.parameters excel file
     variables = [
-        'Temperature',
+        'Temperature','Pressure',
         'RelaxationTime','DiffusionTime','DiffusionCutoff','ChangeThreshold',
         'Criteria_Slope','Criteria_Cycles','Criteria_RxnSelectionCount',
         'Window_Slope','Window_Mean','Window_Pause','Window_RxnSelection',
@@ -122,7 +124,8 @@ def main(argv):
             "# System prep\n"+\
             "python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc.py ${system} ${prefix} "+\
             "\'{}\' \'{}\' ".format(args.molecule_types,args.molecule_counts)+\
-            "-msf ${system}.msf -header ${system}.header\n"+\
+            "-msf ${system}.msf -header ${system}.header -pressure ${Pressure} -temp ${Temperature} "+\
+            "-lammps_units {}\n".format(args.lammps_units)+\
             "mpirun -np {} ".format(args.cores)+\
             "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
             "cp ${prefix}.in.init               ${prefix}_prep.in.init\n"+\
@@ -148,6 +151,7 @@ def main(argv):
             "        -relax ${RelaxationTime}\\\n"+\
             "        -diffusion ${DiffusionTime}\\\n"+\
             "        -atom_style {}\\\n".format(args.atom_style)+\
+            "        -lammps_units {}\\\n".format(args.lammps_units)+\
             "        -num_voxels '{}'\\\n".format(args.num_voxels)+\
             "        -change_threshold ${ChangeThreshold}\\\n"+\
             "        -diffusion_cutoff ${DiffusionCutoff}\\\n"+\
@@ -160,6 +164,7 @@ def main(argv):
             "        -windowsize_rxnselection ${Window_RxnSelection} \\\n"+\
             "        -scalingfactor_adjuster ${Scaling_Adjuster} \\\n"+\
             "        -scalingfactor_minimum ${Scaling_Minimum} \\\n"+\
+            "        --well_mixed \\\n"+\
             "        --no-charged_atoms\\\n"+\
             "    \n\n"+\
             "    # Run MD\n"+\

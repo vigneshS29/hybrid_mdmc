@@ -115,6 +115,7 @@ def write_lammps_init(init_info,out_file,trj=True,step_restarts=True,final_data=
         'avg_freq': 1000,
         'dump4avg': 100,
         'coords_freq': 1000,
+        'units': 'real',
         'atom_style': 'full',
         'pair_style': 'lj/cut/coul/long 14.0 14.0',
         'kspace_style': 'pppm 0.0001',
@@ -188,7 +189,7 @@ def write_lammps_init(init_info,out_file,trj=True,step_restarts=True,final_data=
                 "# Initialize System\n"+\
                 "#===========================================================\n"+\
                 "\n"+\
-                "units real\n"+\
+                "units {}\n".format(init_info['units'])+\
                 "dimension 3\n"+\
                 "newton on\n"+\
                 "boundary p p p\n"+\

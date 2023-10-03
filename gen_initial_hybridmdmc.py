@@ -31,6 +31,10 @@ def main(argv):
 
     parser.add_argument('-header', dest='header', default='', type=str,
                         help='Name of the .header file. If not specififed, script will default to prefix.header')
+    
+    parser.add_argument('-pressure', dest='pressure', default='1', type=str)
+    parser.add_argument('-temp', dest='temp', default='188', type=str)
+    parser.add_argument('-lammps_units', dest='lammps_units', default='real', type=str)
 
     # Parse and store the inputs
     args = parser.parse_args()
@@ -40,6 +44,8 @@ def main(argv):
         args.msf = args.system + '.msf'
     if not args.header:
         args.header = args.system + '.header'
+    args.pressure = float(args.pressure)
+    args.temp = float(args.temp)
 
     # Read in the .msf and .header files
     msf = parse_msf(args.msf)
@@ -132,12 +138,13 @@ def main(argv):
         'dump2avg': 100,
         'coords_freq': 1000,
         'atom_style': 'molecular',
-        'run_name':     [          'relax',           'density',              'heat',         'diffusion'],
-        'run_type':     [      'nve/limit',               'npt',               'npt',               'npt'],
-        'run_steps':    [             1000,              100000,            10000000,            10000000],
-        'run_temp':     [[10.0,10.0,100.0], [100.0,100.0,100.0], [100.0,300.0,100.0], [300.0,300.0,100.0]],
-        'run_press':    [  [1.0,1.0,100.0],     [1.0,1.0,100.0],     [1.0,1.0,100.0],     [1.0,1.0,100.0]],
-        'run_timestep': [             0.25,                 1.0,                 1.0,                 1.0],
+        'units': args.lammps_units,
+        'run_name':     [          'relax',           'density',         'diffusion'],
+        'run_type':     [      'nve/limit',               'npt',               'npt'],
+        'run_steps':    [             1000,            10000000,            10000000],
+        'run_temp':     [[args.temp/10,args.temp/10, args.temp/5], [args.temp, args.temp, args.temp/5], [args.temp, args.temp, args.temp/5]],
+        'run_press':    [  [args.pressure,args.pressure,100.0],[args.pressure,args.pressure,100.0],[args.pressure,args.pressure,100.0]],
+        'run_timestep': [             0.25,                 1.0,                 1.0],
         'restart': False,
         'reset_steps': False,
         'thermo_keywords': ['temp','press','ke','pe'],
@@ -148,6 +155,8 @@ def main(argv):
         'dihedral_style': 'opls',
         'improper_style': 'cvff'
     }
+    if args.lammps_units == 'lj':
+        init['run_timestep'] = [0.001,0.005,0.005]
     write_lammps_init(init,args.prefix+'.in.init',step_restarts=False,final_restart=False,final_data=True)
 
     return
