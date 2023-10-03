@@ -117,6 +117,82 @@ def gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz):
         mol_types=[molecules_dict[m]['type'] for m in mkeys],
         voxels=[molecules_dict[m]['voxel'] for m in mkeys])
 
+def get_rxns_serial(molecules,voxelID2idx,diffusion_rates,rxnscaling,rxn_data,diffusionrate_min):
+    """Creates instance of class hybridmdmc.classes.ReactionList.
+
+    Parameters
+    ----------
+   
+
+    Returns
+    -------
+    rxns: instance of class HybridMDMC_Classes.ReactionList
+    """
+    # The total reaction rate is calculated as follows:
+    # timeofdiffusion = 1 / diffusionrate
+    #   diffusionrate is the rate of diffusion from voxel i to voxel j
+    #   for bimolecular rxns, where the first reactant is in voxel i
+    #   and the second is in voxel j
+    # timeofrxn = 1 / (rawrxnrate * rxnscaling)
+    # totalrxnrate = 1 / (timeofdiffusion + timeofrxn)
+    #
+    # It is assumed that if diffusion/reaction scaling is NOT
+    # requested, all diffusion rates are np.inf/all reaction scalings
+    # are 1.
+
+    rxns,rxn_count = {},1
+    cycle = rxnscaling.index[-1]
+
+    for rxn_type in rxn_data.keys(): # Loop over every possible reaction in the rxn_data
+
+        # Unimolecular reactions
+        if len(rxn_data[rxn_type]['reactants_molecules']) == 1:
+            for molidx in [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] in rxn_data[rxn_type]['reactant_molecules']]:
+                timeofdiffusion = 0
+                timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
+                rxns[rxn_count] = {
+                    'rxn_type': rxn_type,
+                    'reactants': [molidx],
+                    'rate': 1 / (timeofdiffusion + timeofrxn)}
+                rxn_count += 1
+                continue
+
+
+        # Bimolecular reactions
+        elif len(rxn_data[rxn_type]['reactants_molecules']) == 2:
+            reactive_pairs = []
+            reactive_mol_idxs_i = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][0]]
+            reactive_mol_idxs_j = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][1]]
+            for molidx_i in reactive_mol_idxs_i:
+                for molidx_j in reactive_mol_idxs_j:
+                    if molidx_i == molidx_j: continue
+                    if sorted([molidx_i,molidx_j]) in reactive_pairs: continue
+                    diffrate = np.max([
+                        diffusion_rates[molecules.mol_types[molidx_i]][voxelID2idx[molecules.voxels[molidx_i]],voxelID2idx[molecules.voxels[molidx_j]]],
+                        diffusion_rates[molecules.mol_types[molidx_j]][voxelID2idx[molecules.voxels[molidx_j]],voxelID2idx[molecules.voxels[molidx_i]]]
+                    ])
+                    if diffrate < diffusionrate_min: continue
+                    timeofdiffusion = 1 / diffrate
+                    timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
+                    rxns[rxn_count] = {
+                        'rxn_type': rxn_type,
+                        'reactants': [molidx_i,molidx_j],
+                        'rate': 1 / (timeofdiffusion + timeofrxn)}
+                    rxn_count += 1
+                    reactive_pairs.append(sorted([molidx_i,molidx_j]))
+
+        # More than bimolecular rxn
+        elif len(rxn_data[rxn_type]['reactants_molecules']) > 2:
+            print('Error! hybridmdmc.functions.get_rxns does not currently support reactions between more than 2 molecules.')
+
+    rxns = ReactionList(
+        ids=sorted(list(rxns.keys())),
+        rxn_types=[rxns[k]['rxn_type'] for k in sorted(list(rxns.keys())) ],
+        reactants=[rxns[k]['reactants'] for k in sorted(list(rxns.keys())) ],
+        rates=[rxns[k]['rate'] for k in sorted(list(rxns.keys())) ])
+
+    return rxns
+
 
 def get_rxns(molecules,vox,voxelID2idx,diffusion_rates,rxnscaling,delete,rxn_data,diffusion_cutoff,temp):
     """Creates instance of class hybridmdmc.classes.ReactionList.
