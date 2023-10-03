@@ -45,6 +45,10 @@ def main(argv):
                         help='LAMMPS atom style. Default: full')
     parser.add_argument('-lammps_units', dest='lammps_units', type=str, default='real',
                         help='LAMMPS units. Default: real')
+    parser.add_argument('--serial', action='store_true')
+    parser.add_argument('--synchronousparallel', dest='serial', action='store_false')
+    parser.set_defaults(serial=True)
+    
 
     # Parse the line arguments
     args = parser.parse_args()
@@ -70,6 +74,10 @@ def main(argv):
     if extraparameters or extravariables:
         print('Exiting...')
         return
+    
+    mainscript = '~/bin/hybrid_mdmc/hybridmdmc.py'
+    if args.serial:
+        mainscript = '~/bin/hybrid_mdmc/Development/hybridmdmc_serial.py'
 
     # Write the bash file
     with open(args.prefix+'.sh', 'w') as f:
@@ -143,7 +151,8 @@ def main(argv):
             "for i in `seq 0 {}`;do\n".format(int(args.diffusivesteps))+\
             "\n"+\
             "    # Run RMD script\n"+\
-            "    python3 ~/bin/hybrid_mdmc/hybridmdmc.py ${prefix}.end.data -trj_file ${prefix}.diffusion.lammpstrj\\\n"+\
+            "    python3 {} ".format(mainscript)+\
+            "        ${prefix}.end.data -trj_file ${prefix}.diffusion.lammpstrj\\\n"+\
             "        -msf ${system}.msf -rxndf ${system}.rxndf -settings ${system}.in.settings -header ${system}.header\\\n"+\
             "        -diffusion_step ${i}\\\n"+\
             "        -prefix ${prefix}\\\n"+\
