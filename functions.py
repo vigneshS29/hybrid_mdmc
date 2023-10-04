@@ -146,20 +146,20 @@ def get_rxns_serial(molecules,voxelID2idx,diffusion_rates,rxnscaling,rxn_data,di
     for rxn_type in rxn_data.keys(): # Loop over every possible reaction in the rxn_data
 
         # Unimolecular reactions
-        if len(rxn_data[rxn_type]['reactants_molecules']) == 1:
+        if len(rxn_data[rxn_type]['reactant_molecules']) == 1:
             for molidx in [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] in rxn_data[rxn_type]['reactant_molecules']]:
                 timeofdiffusion = 0
                 timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
                 rxns[rxn_count] = {
                     'rxn_type': rxn_type,
-                    'reactants': [molidx],
+                    'reactants': [molecules.ids[molidx]],
                     'rate': 1 / (timeofdiffusion + timeofrxn)}
                 rxn_count += 1
                 continue
 
 
         # Bimolecular reactions
-        elif len(rxn_data[rxn_type]['reactants_molecules']) == 2:
+        elif len(rxn_data[rxn_type]['reactant_molecules']) == 2:
             reactive_pairs = []
             reactive_mol_idxs_i = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][0]]
             reactive_mol_idxs_j = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][1]]
@@ -176,13 +176,13 @@ def get_rxns_serial(molecules,voxelID2idx,diffusion_rates,rxnscaling,rxn_data,di
                     timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
                     rxns[rxn_count] = {
                         'rxn_type': rxn_type,
-                        'reactants': [molidx_i,molidx_j],
+                        'reactants': [molecules.ids[molidx_i],molecules.ids[molidx_j]],
                         'rate': 1 / (timeofdiffusion + timeofrxn)}
                     rxn_count += 1
                     reactive_pairs.append(sorted([molidx_i,molidx_j]))
 
         # More than bimolecular rxn
-        elif len(rxn_data[rxn_type]['reactants_molecules']) > 2:
+        elif len(rxn_data[rxn_type]['reactant_molecules']) > 2:
             print('Error! hybridmdmc.functions.get_rxns does not currently support reactions between more than 2 molecules.')
 
     rxns = ReactionList(

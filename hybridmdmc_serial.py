@@ -267,6 +267,7 @@ def main(argv):
             Reacting = False
 
         # Check for erroneous double deletion
+        print(delete)
         if len(set(delete)) != len(delete):
             print('Error! Molecules deleted twice. Exiting...')
             # quit()

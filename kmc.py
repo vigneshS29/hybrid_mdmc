@@ -186,17 +186,13 @@ def serial_kmc_rxn(rxns,rxn_data,molecules,translate_distance=0.0):
     adjust = np.sqrt(translate_distance**2/3)
     molID2idx = { ID:idx for idx,ID in enumerate(molecules.ids) }
     u2 = 0
+    rates = deepcopy(rxns.rates)
     while u2 == 0:
         u2 = np.random.random()
-    dt = -np.log(u2)/Rmax
+    dt = -np.log(u2)/np.sum(rates)
     u1 = np.random.random()
-    rates = deepcopy(rxns.rates)
-    #rates = rates.tolist()
-    rates.append(Rmax - np.sum(rates))
     rxn_idx = np.argwhere(np.cumsum(rates)>=np.sum(rates)*u1)[0][0]
-    if rxn_idx == len(rates)-1:
-        return {},[],dt,0
-    delete = [rxns.reactants[rxn_idx]]
+    delete = rxns.reactants[rxn_idx]
     rt = rxns.rxn_types[rxn_idx]
     reactants = rxns.reactants[rxn_idx]
     products = rxn_data[rt]['product_molecules']

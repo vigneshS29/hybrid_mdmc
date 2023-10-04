@@ -77,7 +77,7 @@ def main(argv):
     
     mainscript = '~/bin/hybrid_mdmc/hybridmdmc.py'
     if args.serial:
-        mainscript = '~/bin/hybrid_mdmc/Development/hybridmdmc_serial.py'
+        mainscript = '~/bin/hybrid_mdmc/hybridmdmc_serial.py'
 
     # Write the bash file
     with open(args.prefix+'.sh', 'w') as f:
