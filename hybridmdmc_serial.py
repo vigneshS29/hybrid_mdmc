@@ -39,6 +39,15 @@ def main(argv):
     if args.debug:
         breakpoint()
 
+    # if in reduced units, convert temp to K
+    # T* = kB * T / e
+    # e is epsilon (LJ parameter)
+    # assuming that e = 1.0 kcal / mol
+    BoltzmannConstant = 1.987204259e-3 # kcal / (K mol)
+    Epsilon = 1.0 # kcal / mol
+    if args.lammps_units == 'lj':
+        args.temp = args.temp * Epsilon / BoltzmannConstant # K
+
     # Calculate the raw reaction rate for each reaction using the
     # Eyring equation. Ea is expected to be in kcal/mol, temperature is
     # expected to be in K, and the resulting units will be equivalent
@@ -267,7 +276,6 @@ def main(argv):
             Reacting = False
 
         # Check for erroneous double deletion
-        print(delete)
         if len(set(delete)) != len(delete):
             print('Error! Molecules deleted twice. Exiting...')
             # quit()
@@ -359,7 +367,7 @@ def main(argv):
     if not args.charged_atoms:
         init['atom_style'] = 'molecular'
     if args.lammps_units == 'lj':
-        init['run_timestep'] = [0.001, 0.001, 0.001]
+        init['run_timestep'] = [0.001, 0.0005, 0.0005]
     write_lammps_data(args.write_data, atoms, bonds, angles, dihedrals,
                       impropers, box, header=data_header, charge=args.charged_atoms)
     write_lammps_init(init, args.write_init, step_restarts=False,

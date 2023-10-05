@@ -48,6 +48,9 @@ def main(argv):
     parser.add_argument('--serial', action='store_true')
     parser.add_argument('--synchronousparallel', dest='serial', action='store_false')
     parser.set_defaults(serial=True)
+
+    parser.add_argument('--well_mixed', dest='well_mixed', action='store_true')
+    parser.set_defaults(well_mixed=False)
     
 
     # Parse the line arguments
@@ -78,6 +81,10 @@ def main(argv):
     mainscript = '~/bin/hybrid_mdmc/hybridmdmc.py'
     if args.serial:
         mainscript = '~/bin/hybrid_mdmc/hybridmdmc_serial.py'
+    if args.well_mixed:
+        args.well_mixed = '--well_mixed'
+    elif not args.well_mixed:
+        args.well_mixed = ''
 
     # Write the bash file
     with open(args.prefix+'.sh', 'w') as f:
@@ -173,7 +180,7 @@ def main(argv):
             "        -windowsize_rxnselection ${Window_RxnSelection} \\\n"+\
             "        -scalingfactor_adjuster ${Scaling_Adjuster} \\\n"+\
             "        -scalingfactor_minimum ${Scaling_Minimum} \\\n"+\
-            "        --well_mixed \\\n"+\
+            "        {} \\\n".format(args.well_mixed)+\
             "        --no-charged_atoms\\\n"+\
             "    \n\n"+\
             "    # Run MD\n"+\
