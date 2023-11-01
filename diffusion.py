@@ -119,7 +119,7 @@ def get_DiffusionGraph_from_matrix(matrix):
     return graph
 
 
-def get_voxels_byframe(traj_file, atoms_datafile, molecules_datafile, num_voxels):
+def get_voxels_byframe(traj_file, atoms_datafile, molecules_datafile, num_voxels,start=0,end=-1,every=1):
     """
     """
     # Create a dictionary to hold the voxel number of each molecule for
@@ -139,7 +139,7 @@ def get_voxels_byframe(traj_file, atoms_datafile, molecules_datafile, num_voxels
     # Loop over all of the requested frames.
     for frame_atoms, timestep, box in frame_generator(
             traj_file,
-            start=0, end=-1, every=1, unwrap=True,
+            start=start, end=end, every=every, unwrap=True,
             adj_list=adj_list,
             return_prop=False):
 
@@ -185,7 +185,8 @@ def calc_diffusionrate(
         num_voxels,
         xbounds=[],
         ybounds=[],
-        zbounds=[]):
+        zbounds=[],
+        start=0,end=-1,every=1):
     """
     """
     # Calculate the voxels and voxel mapping objects based on the
@@ -216,7 +217,7 @@ def calc_diffusionrate(
     # (which, as provided by calc_voxels, are equivalent to voxel
     # indices).
     voxels_byframe = get_voxels_byframe(
-        trjfile, atoms_datafile, molecules_datafile, num_voxels)
+        trjfile, atoms_datafile, molecules_datafile, num_voxels, start=start, end=end, every=every)
 
     # For each species, create a "voxel transition" array. The ith,jth
     # entry is the total number of transitions from voxel i to voxel j
