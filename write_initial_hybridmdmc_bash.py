@@ -85,6 +85,9 @@ def main(argv):
         args.well_mixed = '--well_mixed'
     elif not args.well_mixed:
         args.well_mixed = ''
+    charged_atoms = '--charged_atoms'
+    if args.atom_style == 'molecular':
+        charged_atoms = '--no-charged_atoms'
 
     # Write the bash file
     with open(args.prefix+'.sh', 'w') as f:
@@ -140,9 +143,10 @@ def main(argv):
             "python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc.py ${system} ${prefix} "+\
             "\'{}\' \'{}\' ".format(args.molecule_types,args.molecule_counts)+\
             "-msf ${system}.msf -header ${system}.header -pressure ${Pressure} -temp ${Temperature} "+\
-            "-lammps_units {}\n".format(args.lammps_units)+\
+            "-atom_style {} \\\n".format(args.atom_style)+\
+            "-lammps_units {} &&\n".format(args.lammps_units)+\
             "mpirun -np {} ".format(args.cores)+\
-            "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
+            "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out &&\n"+\
             "cp ${prefix}.in.init               ${prefix}_prep.in.init\n"+\
             "cp ${prefix}.in.data               ${prefix}_prep.in.data\n"+\
             "cp ${prefix}.end.data              ${prefix}_prep.end.data\n"+\
@@ -151,14 +155,13 @@ def main(argv):
             "cp ${prefix}.thermo.avg            ${prefix}_prep.thermo.avg\n"+\
             "cp ${prefix}.relax.lammpstrj       ${prefix}_prep.relax.lammpstrj\n"+\
             "cp ${prefix}.density.lammpstrj     ${prefix}_prep.density.lammpstrj\n"+\
-            "cp ${prefix}.heat.lammpstrj        ${prefix}_prep.heat.lammpstrj\n"+\
             "cp ${prefix}.diffusion.lammpstrj   ${prefix}_prep.diffusion.lammpstrj\n"+\
             "\n"+\
             "# Reactive loop\n"+\
             "for i in `seq 0 {}`;do\n".format(int(args.diffusivesteps))+\
             "\n"+\
             "    # Run RMD script\n"+\
-            "    python3 {} ".format(mainscript)+\
+            "    python3 {} \\\n".format(mainscript)+\
             "        ${prefix}.end.data -trj_file ${prefix}.diffusion.lammpstrj\\\n"+\
             "        -msf ${system}.msf -rxndf ${system}.rxndf -settings ${system}.in.settings -header ${system}.header\\\n"+\
             "        -diffusion_step ${i}\\\n"+\
@@ -181,18 +184,25 @@ def main(argv):
             "        -scalingfactor_adjuster ${Scaling_Adjuster} \\\n"+\
             "        -scalingfactor_minimum ${Scaling_Minimum} \\\n"+\
             "        {} \\\n".format(args.well_mixed)+\
-            "        --no-charged_atoms\\\n"+\
+            "        {} &&\\\n".format(charged_atoms)+\
             "    \n\n"+\
+            "    cp ${prefix}.in.data             ${prefix}.${i}.in.data\n\n"+\
             "    # Run MD\n"+\
             "    mpirun -np {} ".format(args.cores)+\
-                "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
+                "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out &&\n"+\
             "    \n"+\
             "    # Concatenate files\n"+\
-            "    python3 ~/bin/concatenate_files.py ${prefix}.in.data             ${prefix}.master.in.data             -bookmark \"Step ${i}\"\n"+\
-            "    python3 ~/bin/concatenate_files.py ${prefix}.end.data            ${prefix}.master.end.data            -bookmark \"Step ${i}\"\n"+\
-            "    python3 ~/bin/concatenate_files.py ${prefix}.thermo.avg          ${prefix}.master.thermo.avg          -bookmark \"Step ${i}\"\n"+\
-            "    python3 ~/bin/concatenate_files.py ${prefix}.relax.lammpstrj     ${prefix}.master.relax.lammpstrj     -bookmark \"Step ${i}\"\n"+\
-            "    python3 ~/bin/concatenate_files.py ${prefix}.diffusion.lammpstrj ${prefix}.master.diffusion.lammpstrj -bookmark \"Step ${i}\"\n"+\
+#            "    python3 ~/bin/concatenate_files.py ${prefix}.in.data             ${prefix}.master.in.data             -bookmark \"Step ${i}\"\n"+\
+#            "    python3 ~/bin/concatenate_files.py ${prefix}.end.data            ${prefix}.master.end.data            -bookmark \"Step ${i}\"\n"+\
+#            "    python3 ~/bin/concatenate_files.py ${prefix}.thermo.avg          ${prefix}.master.thermo.avg          -bookmark \"Step ${i}\"\n"+\
+#            "    python3 ~/bin/concatenate_files.py ${prefix}.relax.lammpstrj     ${prefix}.master.relax.lammpstrj     -bookmark \"Step ${i}\"\n"+\
+#            "    python3 ~/bin/concatenate_files.py ${prefix}.diffusion.lammpstrj ${prefix}.master.diffusion.lammpstrj -bookmark \"Step ${i}\"\n"+\
+            "    cp ${prefix}.end.data            ${prefix}.${i}.end.data\n"+\
+            "    cp ${prefix}.lammps.out          ${prefix}.${i}.lammps.out\n"+\
+            "    cp ${prefix}.thermo.avg          ${prefix}.${i}.thermo.avg\n"+\
+            "    cp ${prefix}.relax.lammpstrj     ${prefix}.${i}.relax.lammpstrj\n"+\
+            "    cp ${prefix}.equil.lammpstrj     ${prefix}.${i}.equil.lammpstrj\n"+\
+            "    cp ${prefix}.diffusion.lammpstrj ${prefix}.${i}.diffusion.lammpstrj\n"+\
             "\n"+\
             "done\n"+\
             "\n"+\

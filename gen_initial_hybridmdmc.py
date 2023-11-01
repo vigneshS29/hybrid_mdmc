@@ -35,6 +35,7 @@ def main(argv):
     parser.add_argument('-pressure', dest='pressure', default='1', type=str)
     parser.add_argument('-temp', dest='temp', default='188', type=str)
     parser.add_argument('-lammps_units', dest='lammps_units', default='real', type=str)
+    parser.add_argument('-atom_style', dest='atom_style', default='full', type=str)
 
     # Parse and store the inputs
     args = parser.parse_args()
@@ -115,6 +116,10 @@ def main(argv):
         for inter_ in interactions.keys()
     }
 
+    charge = False
+    if args.atom_style == 'full':
+        charge = True
+
     # Write the LAMMPS data file
     write_lammps_data(
         args.prefix+'.in.data',
@@ -124,7 +129,7 @@ def main(argv):
         interaction_instances['Dihedrals'],
         interaction_instances['Impropers'],
         [[-box_length/2,box_length/2]]*3,
-        charge=False,
+        charge=charge,
         header=header
     )
 
@@ -133,21 +138,21 @@ def main(argv):
         'settings': '{}.in.settings'.format(args.system),
         'prefix': args.prefix,
         'data': args.prefix+'.in.data',
-        'thermo_freq': 1000,
-        'avg_freq': 1000,
-        'dump2avg': 100,
-        'coords_freq': 1000,
-        'atom_style': 'molecular',
+        'thermo_freq': 10,
+        'avg_freq': 10,
+        'dump4avg': 10,
+        'coords_freq': 100,
+        'atom_style': args.atom_style,
         'units': args.lammps_units,
         'run_name':     [          'relax',           'density',         'diffusion'],
         'run_type':     [      'nve/limit',               'npt',               'npt'],
-        'run_steps':    [             1000,            10000000,            10000000],
+        'run_steps':    [             1000,              300000,              300000],
         'run_temp':     [[args.temp/10,args.temp/10, args.temp/5], [args.temp, args.temp, args.temp/5], [args.temp, args.temp, args.temp/5]],
         'run_press':    [  [args.pressure,args.pressure,100.0],[args.pressure,args.pressure,100.0],[args.pressure,args.pressure,100.0]],
         'run_timestep': [             0.25,                 1.0,                 1.0],
         'restart': False,
         'reset_steps': False,
-        'thermo_keywords': ['temp','press','ke','pe'],
+        'thermo_keywords': ['temp','press','ke','pe','pxx','pyy','pzz','pxy','pxz','pyz'],
         'pair_style': 'lj/cut 9.0',
         'kspace_style': None,
         'bond_style': 'harmonic',

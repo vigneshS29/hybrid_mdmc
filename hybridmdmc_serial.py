@@ -338,6 +338,24 @@ def main(argv):
         rxn_cycle += 1
         add, delete, selected_rxn_types = {}, [], []
 
+    # Catch atomic overlaps
+    overlaps = True
+    while overlaps:
+        repeats = []
+        for idx_i,id_i in enumerate(atoms.ids):
+            for idx_j,id_j in enumerate(atoms.ids):
+                if idx_i == idx_j: continue
+                if atoms.x[idx_i] != atoms.x[idx_j]: continue
+                if atoms.y[idx_i] != atoms.y[idx_j]: continue
+                if atoms.z[idx_i] != atoms.z[idx_j]: continue
+                repeats += [sorted((idx_i,idx_j))]
+        for _ in repeats:
+            atoms.x[_[0]] += 0.01
+            atoms.y[_[0]] += 0.01
+            atoms.z[_[0]] += 0.01
+        if len(repeats) == 0:
+            overlaps = False
+
     # Write the resulting data and init files
     init = {
         'settings': args.settings,
@@ -347,10 +365,11 @@ def main(argv):
         'avg_freq': 1000,
         'dump4avg': 100,
         'coords_freq': 1000,
+        'atom_style': args.atom_style,
         'units': args.lammps_units,
         'run_name': ['relax', 'equil', 'diffusion'],
         'run_type': ['nve/limit', 'npt', 'npt'],
-        'run_steps': [args.relax, args.diffusion*10, args.diffusion],
+        'run_steps': [args.relax, args.diffusion, args.diffusion],
         'run_temp': [[args.temp, args.temp, 10.0], [args.temp, args.temp, 100.0], [args.temp, args.temp, 100.0]],
         'run_press': [[args.press, args.press, 100.0], [args.press, args.press, 100.0], [args.press, args.press, 100.0]],
         'run_timestep': [0.25, 1.0, 1.0],
@@ -364,10 +383,8 @@ def main(argv):
     init['improper_style'] = 'cvff'
     init['neigh_modify'] = 'every 1 delay 0 check yes one 10000'
     init['coords_freq'] = 20
-    if not args.charged_atoms:
-        init['atom_style'] = 'molecular'
     if args.lammps_units == 'lj':
-        init['run_timestep'] = [0.001, 0.0005, 0.0005]
+        init['run_timestep'] = [0.001, 0.00001, 0.00001]
     write_lammps_data(args.write_data, atoms, bonds, angles, dihedrals,
                       impropers, box, header=data_header, charge=args.charged_atoms)
     write_lammps_init(init, args.write_init, step_restarts=False,
