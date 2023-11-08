@@ -357,6 +357,8 @@ def main(argv):
             overlaps = False
 
     # Write the resulting data and init files
+    if args.lammps_units == 'lj':
+        args.temp = args.temp / Epsilon * BoltzmannConstant # unitless
     init = {
         'settings': args.settings,
         'prefix': args.prefix,
@@ -369,7 +371,7 @@ def main(argv):
         'units': args.lammps_units,
         'run_name': ['relax', 'equil', 'diffusion'],
         'run_type': ['nve/limit', 'npt', 'npt'],
-        'run_steps': [args.relax, args.diffusion, args.diffusion],
+        'run_steps': [args.relax, 0.2*args.diffusion, args.diffusion],
         'run_temp': [[args.temp, args.temp, 10.0], [args.temp, args.temp, 100.0], [args.temp, args.temp, 100.0]],
         'run_press': [[args.press, args.press, 100.0], [args.press, args.press, 100.0], [args.press, args.press, 100.0]],
         'run_timestep': [0.25, 1.0, 1.0],
