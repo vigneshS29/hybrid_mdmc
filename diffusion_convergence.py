@@ -27,6 +27,7 @@ def main(argv):
     atoms, bonds, angles, dihedrals, impropers, box, adj_mat, extra_prop = parse_data_file(
         args.data_file, unwrap=True, atom_style=args.atom_style)
     masterspecies = parse_msf(args.msf)
+    rxndata = parse_rxndf(args.rxndf)
 
     # Initialize the output file
     with open(args.prefix+'.diffusionconvergence','w') as f:
@@ -41,6 +42,7 @@ def main(argv):
         f.write('{}\n\n'.format('-'*100))
 
     # Calculate the average diffusion rates
+    reactivespecies = {k:v for k,v in masterspecies.items() if k in set([i for l in [_['reactant_molecules'] for _ in rxndata.values()] for i in l])}
     timesteps = get_trj_timesteps(args.trj_file)
     for window in args.timewindows:
         numberofwindows = int((timesteps[-1] - timesteps[0])/window)
@@ -51,7 +53,7 @@ def main(argv):
                 args.trj_file,
                 atoms,
                 box,
-                masterspecies,
+                reactivespecies,
                 args.num_voxels,
                 xbounds=args.x_bounds,
                 ybounds=args.y_bounds,
