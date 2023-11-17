@@ -197,12 +197,12 @@ def main(argv):
 #            "    python3 ~/bin/concatenate_files.py ${prefix}.thermo.avg          ${prefix}.master.thermo.avg          -bookmark \"Step ${i}\"\n"+\
 #            "    python3 ~/bin/concatenate_files.py ${prefix}.relax.lammpstrj     ${prefix}.master.relax.lammpstrj     -bookmark \"Step ${i}\"\n"+\
 #            "    python3 ~/bin/concatenate_files.py ${prefix}.diffusion.lammpstrj ${prefix}.master.diffusion.lammpstrj -bookmark \"Step ${i}\"\n"+\
-            "    cp ${prefix}.end.data            ${prefix}.${i}.end.data\n"+\
-            "    cp ${prefix}.lammps.out          ${prefix}.${i}.lammps.out\n"+\
-            "    cp ${prefix}.thermo.avg          ${prefix}.${i}.thermo.avg\n"+\
-            "    cp ${prefix}.relax.lammpstrj     ${prefix}.${i}.relax.lammpstrj\n"+\
-            "    cp ${prefix}.equil.lammpstrj     ${prefix}.${i}.equil.lammpstrj\n"+\
-            "    cp ${prefix}.diffusion.lammpstrj ${prefix}.${i}.diffusion.lammpstrj\n"+\
+#            "    cp ${prefix}.end.data            ${prefix}.${i}.end.data\n"+\
+#            "    cp ${prefix}.lammps.out          ${prefix}.${i}.lammps.out\n"+\
+#            "    cp ${prefix}.thermo.avg          ${prefix}.${i}.thermo.avg\n"+\
+#            "    cp ${prefix}.relax.lammpstrj     ${prefix}.${i}.relax.lammpstrj\n"+\
+#            "    cp ${prefix}.equil.lammpstrj     ${prefix}.${i}.equil.lammpstrj\n"+\
+#            "    cp ${prefix}.diffusion.lammpstrj ${prefix}.${i}.diffusion.lammpstrj\n"+\
             "\n"+\
             "done\n"+\
             "\n"+\

@@ -17,11 +17,16 @@ def main(argv):
 
     # Use HMDMC_ArgumentParser to parse the command line.
     parser = HMDMC_ArgumentParser()
-    parser.add_argument(dest='timewindows', type=str)
+#    parser.add_argument('-timewindows', dest='timewindows', type=str, default='')
     parser.HMDMC_parse_args()
     parser.adjust_default_args()
     args = parser.args
-    args.timewindows = [int(_) for _ in args.timewindows.split()]
+#    args.timewindows = [int(_) for _ in args.timewindows.split()]
+    args.timewindows = [
+        100,
+        1000,2000,3000,4000,5000,6000,7000,8000,9000,
+        10000,20000,30000,40000,50000,60000,70000,80000,90000,
+        100000,200000,300000]
 
     # Read in the data_file, diffusion_file, rxndf, and msf files.
     atoms, bonds, angles, dihedrals, impropers, box, adj_mat, extra_prop = parse_data_file(
@@ -42,7 +47,7 @@ def main(argv):
         f.write('{}\n\n'.format('-'*100))
 
     # Calculate the average diffusion rates
-    reactivespecies = {k:v for k,v in masterspecies.items() if k in set([i for l in [_['reactant_molecules'] for _ in rxndata.values()] for i in l])}
+    #reactivespecies = {k:v for k,v in masterspecies.items() if k in set([i for l in [_['reactant_molecules'] for _ in rxndata.values()] for i in l])}
     timesteps = get_trj_timesteps(args.trj_file)
     for window in args.timewindows:
         numberofwindows = int((timesteps[-1] - timesteps[0])/window)
@@ -53,7 +58,8 @@ def main(argv):
                 args.trj_file,
                 atoms,
                 box,
-                reactivespecies,
+                #reactivespecies,
+                masterspecies,
                 args.num_voxels,
                 xbounds=args.x_bounds,
                 ybounds=args.y_bounds,

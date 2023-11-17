@@ -204,17 +204,21 @@ def main(argv):
         breakpoint()
 
     # If requested, calculate the diffusion rate for each species.
-    reactivespecies = {k:v for k,v in masterspecies.items() if k in set([i for l in [_['reactant_molecules'] for _ in rxndata.values()] for i in l])}
+    #reactivespecies = {k:v for k,v in masterspecies.items() if k in set([i for l in [_['reactant_molecules'] for _ in rxndata.values()] for i in l])}
     diffusion_rate = {
         _: np.full((len(voxels), len(voxels)), fill_value=np.inf)
-        for _ in reactivespecies.keys()
+        #for _ in reactivespecies.keys()
+        for _ in masterspecies.keys()
     }
+    if args.debug:
+        breakpoint()
     if not args.well_mixed:
         diffusion_rate = calc_diffusionrate(
             args.trj_file,
             atoms,
             box,
-            reactivespecies,
+            #reactivespecies,
+            masterspecies,
             args.num_voxels,
             xbounds=args.x_bounds,
             ybounds=args.y_bounds,
@@ -367,7 +371,7 @@ def main(argv):
         'thermo_freq': 1000,
         'avg_freq': 1000,
         'dump4avg': 100,
-        'coords_freq': 1000,
+        'coords_freq': args.diffusion/1000,
         'atom_style': args.atom_style,
         'units': args.lammps_units,
         'run_name': ['relax', 'equil', 'diffusion'],
