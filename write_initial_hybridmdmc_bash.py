@@ -39,7 +39,7 @@ def main(argv):
                         help='Time limit of run (str). Default: 03:00:00')
     parser.add_argument('-num_voxels', dest='num_voxels', type=str, default='6 6 6',
                         help='String of voxel delineations. Default: 6 6 6')
-    parser.add_argument('-diffusivesteps', dest='diffusivesteps', type=str, default='20000',
+    parser.add_argument('-diffusivesteps', dest='diffusivesteps', type=str, default='2000',
                         help='Number of diffusive steps to run.')
     parser.add_argument('-atom_style', dest='atom_style', type=str, default='full',
                         help='LAMMPS atom style. Default: full')
@@ -158,7 +158,7 @@ def main(argv):
             "cp ${prefix}.diffusion.lammpstrj   ${prefix}_prep.diffusion.lammpstrj\n"+\
             "\n"+\
             "# Reactive loop\n"+\
-            "for i in `seq 0 {}`;do\n".format(int(args.diffusivesteps))+\
+            "for i in `seq 0 {}`; do\n".format(int(args.diffusivesteps))+\
             "\n"+\
             "    # Run RMD script\n"+\
             "    python3 {} \\\n".format(mainscript)+\
@@ -186,10 +186,9 @@ def main(argv):
             "        {} \\\n".format(args.well_mixed)+\
             "        {} &&\\\n".format(charged_atoms)+\
             "    \n\n"+\
-            "    cp ${prefix}.in.data             ${prefix}.${i}.in.data\n\n"+\
             "    # Run MD\n"+\
             "    mpirun -np {} ".format(args.cores)+\
-                "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out &&\n"+\
+                "/depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in  ${prefix}.in.init > ${prefix}.lammps.out\n"+\
             "    \n"+\
             "    # Concatenate files\n"+\
 #            "    python3 ~/bin/concatenate_files.py ${prefix}.in.data             ${prefix}.master.in.data             -bookmark \"Step ${i}\"\n"+\

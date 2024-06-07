@@ -686,7 +686,11 @@ def scalerxns(
     # Append the new reaction scaling to rxnscaling
     rxnscaling.loc[lastcycle+1] = [newscaling[rxntype] for rxntype in rxnscaling.columns]
 
-    # Finally, adjust scalings that are outside of the scaling limits.
+    # If all reactions are scaled, upscale
+    while not np.any(rxnscaling.loc[lastcycle+1] >= 1.0):
+        rxnscaling.loc[lastcycle+1] /= scalingfactor_adjuster
+
+    # Adjust scalings that are outside of the scaling limits.
     rxnscaling[rxnscaling > 1.0] = 1.0
     rxnscaling[rxnscaling < scalingfactor_minimum] = scalingfactor_minimum
 
