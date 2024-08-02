@@ -117,7 +117,7 @@ def gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz):
         mol_types=[molecules_dict[m]['type'] for m in mkeys],
         voxels=[molecules_dict[m]['voxel'] for m in mkeys])
 
-def get_rxns_serial(molecules,voxelID2idx,diffusion_rates,rxnscaling,rxn_data,diffusionrate_min):
+def get_rxns_serial(molecules,voxelID2idx,diffusion_rate,rxnscaling,rxn_data,minimum_diffusion_rate):
     """Creates instance of class hybridmdmc.classes.ReactionList.
 
     Parameters
@@ -140,58 +140,60 @@ def get_rxns_serial(molecules,voxelID2idx,diffusion_rates,rxnscaling,rxn_data,di
     # requested, all diffusion rates are np.inf/all reaction scalings
     # are 1.
 
-    rxns,rxn_count = {},1
+    reactions, number_of_reactions = {},0
     cycle = rxnscaling.index[-1]
 
     for rxn_type in rxn_data.keys(): # Loop over every possible reaction in the rxn_data
 
         # Unimolecular reactions
         if len(rxn_data[rxn_type]['reactant_molecules']) == 1:
-            for molidx in [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] in rxn_data[rxn_type]['reactant_molecules']]:
-                timeofdiffusion = 0
-                timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
-                rxns[rxn_count] = {
-                    'rxn_type': rxn_type,
-                    'reactants': [molecules.ids[molidx]],
-                    'rate': 1 / (timeofdiffusion + timeofrxn)}
-                rxn_count += 1
-                continue
-
+            reactive_molecule_idxs_i =  [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] in rxn_data[rxn_type]['reactant_molecules']]
+            reactions.update({ reaction_index+1+number_of_reactions:
+                    [
+                        rxn_type, # reaction type
+                        [molecules.ids[molecule_index]], # list of molecule ID
+                        rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type] # reactione event rate
+                    ]
+                    for reaction_index,molecule_index in enumerate(reactive_molecule_idxs_i)})
+            continue
 
         # Bimolecular reactions
         elif len(rxn_data[rxn_type]['reactant_molecules']) == 2:
-            reactive_pairs = []
-            reactive_mol_idxs_i = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][0]]
-            reactive_mol_idxs_j = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][1]]
-            for molidx_i in reactive_mol_idxs_i:
-                for molidx_j in reactive_mol_idxs_j:
-                    if molidx_i == molidx_j: continue
-                    if sorted([molidx_i,molidx_j]) in reactive_pairs: continue
-                    diffrate = np.max([
-                        diffusion_rates[molecules.mol_types[molidx_i]][voxelID2idx[molecules.voxels[molidx_i]],voxelID2idx[molecules.voxels[molidx_j]]],
-                        diffusion_rates[molecules.mol_types[molidx_j]][voxelID2idx[molecules.voxels[molidx_j]],voxelID2idx[molecules.voxels[molidx_i]]]
-                    ])
-                    if diffrate < diffusionrate_min: continue
-                    timeofdiffusion = 1 / diffrate
-                    timeofrxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
-                    rxns[rxn_count] = {
-                        'rxn_type': rxn_type,
-                        'reactants': [molecules.ids[molidx_i],molecules.ids[molidx_j]],
-                        'rate': 1 / (timeofdiffusion + timeofrxn)}
-                    rxn_count += 1
-                    reactive_pairs.append(sorted([molidx_i,molidx_j]))
+            reactive_molecule_idxs_i = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][0]]
+            reactive_molecule_idxs_j = [idx for idx,molID in enumerate(molecules.ids) if molecules.mol_types[idx] == rxn_data[rxn_type]['reactant_molecules'][1]]
+            diffusion_rates_forward = np.array( [
+                                    [diffusion_rate[molecules.mol_types[molidx_i]][voxelID2idx[molecules.voxels[molidx_i]],voxelID2idx[molecules.voxels[molidx_j]]] for molidx_j in reactive_molecule_idxs_j]
+                                    for molidx_i in reactive_molecule_idxs_i],
+                )
+            diffusion_rates_reverse = np.array( [
+                                    [diffusion_rate[molecules.mol_types[molidx_j]][voxelID2idx[molecules.voxels[molidx_j]],voxelID2idx[molecules.voxels[molidx_i]]] for molidx_i in reactive_molecule_idxs_i]
+                                    for molidx_j in reactive_molecule_idxs_j],
+                )
+            diffusion_rates = np.maximum(diffusion_rates_reverse,diffusion_rates_forward)
+            upper_triangle_indices = np.triu_indices_from(diffusion_rates, k=1)
+            filtered_indices = [(i, j) for i, j in zip(*upper_triangle_indices) if diffusion_rates[i, j] > minimum_diffusion_rate]
+            times_of_diffusion = 1 / diffusion_rates
+            times_of_rxn = 1 / (rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type])
+            reactions.update({ reaction_index+1+number_of_reactions:
+                    [
+                        rxn_type, # reaction type
+                        [molecules.ids[reactive_molecule_idxs_i[value[0]]], molecules.ids[reactive_molecule_idxs_j[value[1]]]], # list of molecule IDs
+                        1 / (times_of_diffusion[value] + times_of_rxn) # reaction event rate
+                    ] for reaction_index,value in enumerate(filtered_indices)})
+            number_of_reactions = len(reactions)
+            continue
 
         # More than bimolecular rxn
         elif len(rxn_data[rxn_type]['reactant_molecules']) > 2:
             print('Error! hybridmdmc.functions.get_rxns does not currently support reactions between more than 2 molecules.')
 
-    rxns = ReactionList(
-        ids=sorted(list(rxns.keys())),
-        rxn_types=[rxns[k]['rxn_type'] for k in sorted(list(rxns.keys())) ],
-        reactants=[rxns[k]['reactants'] for k in sorted(list(rxns.keys())) ],
-        rates=[rxns[k]['rate'] for k in sorted(list(rxns.keys())) ])
+    reactions = ReactionList(
+        ids=sorted(list(reactions.keys())),
+        rxn_types=[reactions[k][0] for k in sorted(list(reactions.keys())) ], # reaction types
+        reactants=[reactions[k][1] for k in sorted(list(reactions.keys())) ], # lists of reactant molecule(s) ID(s)
+        rates=[reactions[k][2] for k in sorted(list(reactions.keys())) ])     # rates
 
-    return rxns
+    return reactions
 
 
 def get_rxns(molecules,vox,voxelID2idx,diffusion_rates,rxnscaling,delete,rxn_data,diffusion_cutoff,temp):
