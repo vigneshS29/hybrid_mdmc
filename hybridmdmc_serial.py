@@ -363,7 +363,8 @@ def main(argv):
 
     # Write the resulting data and init files
     if args.lammps_units == 'lj':
-        args.temp = args.temp / Epsilon * BoltzmannConstant # unitless
+        args.temp = 1.267
+        # args.temp = args.temp / Epsilon * BoltzmannConstant # unitless
     init = {
         'settings': args.settings,
         'prefix': args.prefix,
@@ -375,7 +376,7 @@ def main(argv):
         'atom_style': args.atom_style,
         'units': args.lammps_units,
         'run_name': ['relax', 'equil', 'diffusion'],
-        'run_type': ['nve/limit', 'npt', 'npt'],
+        'run_type': ['nve/limit', 'nvt', 'nvt'],
         'run_steps': [args.relax, 0.2*args.diffusion, args.diffusion],
         'run_temp': [[args.temp, args.temp, 10.0], [args.temp, args.temp, 100.0], [args.temp, args.temp, 100.0]],
         'run_press': [[args.press, args.press, 100.0], [args.press, args.press, 100.0], [args.press, args.press, 100.0]],
@@ -388,10 +389,11 @@ def main(argv):
     init['angle_style'] = 'harmonic'
     init['dihedral_style'] = 'opls'
     init['improper_style'] = 'cvff'
-    init['neigh_modify'] = 'every 1 delay 0 check yes one 10000'
+    init['neigh_modify'] = 'every 5 delay 0 check yes one 10000'
     init['coords_freq'] = 20
     if args.lammps_units == 'lj':
-        init['run_timestep'] = [0.001, 0.00001, 0.00001]
+        init['pair_style'] = 'lj/cut 3.0'
+        init['run_timestep'] = [0.00025, 0.001, 0.001]
     write_lammps_data(args.write_data, atoms, bonds, angles, dihedrals,
                       impropers, box, header=data_header, charge=args.charged_atoms)
     write_lammps_init(init, args.write_init, step_restarts=False,

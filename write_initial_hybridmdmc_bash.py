@@ -70,11 +70,12 @@ def main(argv):
         return
     extraparameters = [_ for _ in parameters.index if _ not in variables]
     extravariables = [_ for _ in variables if _ not in parameters.index]
-    if extraparameters:
-        print('Error! Parameters listed in {} that are not expected by {}; {}'.format(args.parameters,sys.argv[0],' ',join(extraparameters)))
+#    if extraparameters:
+#        print('Error! Parameters listed in {} that are not expected by {}; {}'.format(args.parameters,sys.argv[0],' ',join(extraparameters)))
     if extravariables:
         print('Error! Parameters missing from {} that are required by {}; {}'.format(args.parameters,sys.argv[0],' '.join(extravariables)))
-    if extraparameters or extravariables:
+#    if extraparameters or extravariables:
+    if extravariables:
         print('Exiting...')
         return
     
