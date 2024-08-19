@@ -136,7 +136,7 @@ def main(argv):
     # Write the LAMMPS init file
     init_writer = LammpsInitHandler(
         prefix = args.prefix,
-        settings_file_name = args.prefix + '.in.settings',
+        settings_file_name = args.system + '.in.settings',
         data_file_name = args.prefix + '.in.data',
         thermo_freq = 100,
         coords_freq = 100,
@@ -156,7 +156,7 @@ def main(argv):
         run_styles = ['nvt deform','nvt'],
         run_steps = [15000,50000],
         run_temperatures = ['1.267 1.267 0.425','1.267 1.267 0.425'],
-        run_pressure_volumes = ['1 x final -4.0 4.0 y final -4.0 4.0 z final -4.0 4.0 units box',''],
+        run_pressure_volumes = ['1 x final -5.25 5.25 y final -5.25 5.25 z final -5.25 5.25 units box',''],
         run_timesteps = [0.001,0.001],
         thermo_keywords = ['temp', 'press', 'ke', 'pe', 'ebond', 'evdwl'],
         neigh_modify = 'every 5 delay 0 check no one 10000',

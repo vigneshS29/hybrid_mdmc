@@ -574,6 +574,7 @@ class LammpsInitHandler:
 
         timestep {}
         velocity all create {} {}
+        run_style verlet
         """.format(name,style,timestep,temperature.split()[0],np.random.randint(1,1e6))).rstrip()
 
         if self.write_trajectories == True:
@@ -641,7 +642,6 @@ class LammpsInitHandler:
             newton {}
             boundary p p p
             atom_style {}
-            run_style verlet
             neigh_modify {}
             
             # Force-field definition
