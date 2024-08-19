@@ -8,7 +8,7 @@ import sys,argparse,time,random
 import numpy as np
 from copy import copy,deepcopy
 from mol_classes import AtomList,IntraModeList
-from lammps_files_classes import write_lammps_data,write_lammps_init
+from lammps_files_classes import write_lammps_data,write_lammps_init,LammpsInitHandler
 from parsers import parse_msf,parse_header
 
 
@@ -134,35 +134,38 @@ def main(argv):
     )
 
     # Write the LAMMPS init file
-    init = {
-        'settings': '{}.in.settings'.format(args.system),
-        'prefix': args.prefix,
-        'data': args.prefix+'.in.data',
-        'thermo_freq': 10,
-        'avg_freq': 10,
-        'dump4avg': 10,
-        'coords_freq': 100,
-        'atom_style': args.atom_style,
-        'units': args.lammps_units,
-        'run_name':     [          'relax',           'density',         'diffusion'],
-        'run_type':     [      'nve/limit',               'npt',               'npt'],
-        'run_steps':    [             1000,              300000,              300000],
-        'run_temp':     [[args.temp/10,args.temp/10, args.temp/5], [args.temp, args.temp, args.temp/5], [args.temp, args.temp, args.temp/5]],
-        'run_press':    [  [args.pressure,args.pressure,100.0],[args.pressure,args.pressure,100.0],[args.pressure,args.pressure,100.0]],
-        'run_timestep': [             0.25,                 1.0,                 1.0],
-        'restart': False,
-        'reset_steps': False,
-        'thermo_keywords': ['temp','press','ke','pe','pxx','pyy','pzz','pxy','pxz','pyz'],
-        'pair_style': 'lj/cut 9.0',
-        'kspace_style': None,
-        'bond_style': 'harmonic',
-        'angle_Style': 'harmonic',
-        'dihedral_style': 'opls',
-        'improper_style': 'cvff'
-    }
-    if args.lammps_units == 'lj':
-        init['run_timestep'] = [0.001,0.005,0.005]
-    write_lammps_init(init,args.prefix+'.in.init',step_restarts=False,final_restart=False,final_data=True)
+    init_writer = LammpsInitHandler(
+        prefix = args.prefix,
+        settings_file_name = args.prefix + '.in.settings',
+        data_file_name = args.prefix + '.in.data',
+        thermo_freq = 100,
+        coords_freq = 100,
+        avg_calculate_every = 50,
+        avg_number_of_steps = 10,
+        avg_stepsize = 5,
+        units = 'lj',
+        atom_style = 'full',
+        dimension = 3,
+        newton = 'on',
+        pair_style = 'lj/cut 3.0',
+        bond_style =  'harmonic',
+        angle_style =  'harmonic',
+        dihedral_style =  'opls',
+        improper_style =  'cvff',
+        run_names = ['shrink','diffusion'],
+        run_styles = ['nvt deform','nvt'],
+        run_steps = [15000,50000],
+        run_temperatures = ['1.267 1.267 0.425','1.267 1.267 0.425'],
+        run_pressure_volumes = ['1 x final -4.0 4.0 y final -4.0 4.0 z final -4.0 4.0 units box',''],
+        run_timesteps = [0.001,0.001],
+        thermo_keywords = ['temp', 'press', 'ke', 'pe', 'ebond', 'evdwl'],
+        neigh_modify = 'every 5 delay 0 check no one 10000',
+        write_trajectories = True,
+        write_intermediate_restarts = False,
+        write_final_data = True,
+        write_final_restarts = True,
+    )
+    init_writer.write()
 
     return
 

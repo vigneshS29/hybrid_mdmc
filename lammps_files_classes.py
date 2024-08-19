@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
+from textwrap import dedent
 
 # Simple function for testing whether a given string can be made into a float
 def isfloat_str(string):
@@ -473,7 +474,7 @@ def parse_data_header_and_masses(fname):
 
             fields = line.split()
             if fields == []: continue
-            if fields[0] == '#': conitnue
+            if fields[0] == '#': continue
             if fields[0] == 'Masses':
                 flag = 'Masses'
                 continue
@@ -492,3 +493,208 @@ def parse_data_header_and_masses(fname):
 
     header['masses'] = [ (k,header['masses'][k]) for k in sorted(list(header['masses'].keys())) ]
     return header
+
+class LammpsInitHandler:
+
+    def __init__(
+            self,
+            prefix = 'default',
+            settings_file_name = 'default.in.settings',
+            data_file_name = 'default.in.data',
+            thermo_freq = 100,
+            coords_freq = 100,
+            avg_calculate_every = 50,
+            avg_number_of_steps = 10,
+            avg_stepsize = 5,
+            units = 'lj',
+            atom_style = 'full',
+            dimension = 3,
+            newton = 'on',
+            pair_style = 'lj/cut 3.0',
+            bond_style =  'harmonic',
+            angle_style =  'harmonic',
+            dihedral_style =  'opls',
+            improper_style =  'cvff',
+            run_names =  [ 'equil1' ],
+            run_styles =  [ 'npt' ],
+            run_steps =  [ 1000000 ],
+            run_temperatures =  [ [298.0,298.0,100.0] ],
+            run_pressure_volumes =  [ [1.0,1.0,100.0] ],
+            run_timesteps =  [1.0],
+            thermo_keywords =  ['temp', 'press', 'ke', 'pe'],
+            neigh_modify =  'every 1 delay 10 check yes one 10000',
+            write_trajectories = True,
+            write_intermediate_restarts = True,
+            write_final_data = True,
+            write_final_restarts = True,
+            ) -> None :
+
+        # Set attributes using the default values
+        self.prefix = prefix
+        self.settings_file_name = settings_file_name
+        self.data_file_name = data_file_name
+        self.thermo_freq = thermo_freq
+        self.coords_freq = coords_freq
+        self.avg_calculate_every = avg_calculate_every
+        self.avg_number_of_steps = avg_number_of_steps
+        self.avg_stepsize =avg_stepsize
+        self.units = units
+        self.atom_style = atom_style
+        self.dimension = dimension
+        self.newton = newton
+        self.pair_style = pair_style
+        self.bond_style = bond_style
+        self.angle_style = angle_style
+        self.dihedral_style = dihedral_style
+        self.improper_style = improper_style
+        self.run_names = run_names
+        self.run_styles = run_styles
+        self.run_steps = run_steps
+        self.run_temperatures = run_temperatures
+        self.run_pressure_volumes = run_pressure_volumes
+        self.run_timesteps = run_timesteps
+        self.thermo_keywords = thermo_keywords
+        self.neigh_modify = neigh_modify
+        self.write_trajectories = write_trajectories
+        self.write_intermediate_restarts = write_intermediate_restarts
+        self.write_final_data = write_final_data
+        self.write_final_restarts = write_final_restarts
+
+        return
+
+    def generate_run_lines(self,name,style,timestep,steps,temperature,pressure_volume):
+
+        fixes = []
+        dumps = []
+
+        lines = dedent("""
+        #===========================================================
+        # {} ({})
+        #===========================================================
+
+        timestep {}
+        velocity all create {} {}
+        """.format(name,style,timestep,temperature.split()[0],np.random.randint(1,1e6))).rstrip()
+
+        if self.write_trajectories == True:
+            lines += dedent("""
+            dump {} all custom {} {}.{}.lammpstrj id mol type xu yu zu vx vy vz
+            dump_modify {} sort id format float %20.10g
+            """.format(name,self.coords_freq,self.prefix,name,name)).rstrip()
+            dumps += [name]
+
+        if style == 'nvt deform':
+            lines += dedent("""
+            fix {}_deform all deform {}
+            fix {}_nvt all nvt temp {}
+            """.format(name,pressure_volume,name,temperature)).rstrip()
+            fixes += ["{}_deform".format(name),"{}_nvt".format(name)]
+
+        if style == 'nve/limit':
+            lines += dedent("""
+            fix {} all nve/limit {}
+            """.format(name,pressure_volume)).rstrip()
+            fixes += ["{}".format(name)]
+
+        if style == 'nvt':
+            lines += dedent("""
+            fix {} all nvt temp {}
+            """.format(name,temperature)).rstrip()
+            fixes += ["{}".format(name)]
+
+        lines += dedent("""
+        run {}
+        """.format(steps)).rstrip()
+
+        for fix in fixes:
+            lines += dedent("""
+            unfix {}
+            """.format(fix)).rstrip()
+
+        for dump in dumps:
+            lines += dedent("""
+            undump {}
+            """.format(dump)).rstrip()
+
+        if self.write_intermediate_restarts:
+            lines += dedent("""
+            write_restart {}.restart
+            """.format(name)).rstrip()
+
+        lines += '\n'
+
+        return lines
+
+    def write(self):
+        file = open(self.prefix + '.in.init', 'w')
+        file.write(
+            dedent("""\
+            # LAMMPS init file
+
+            #===========================================================
+            # Initialize System
+            #===========================================================
+
+            # System definition
+            units {}
+            dimension {}
+            newton {}
+            boundary p p p
+            atom_style {}
+            run_style verlet
+            neigh_modify {}
+            
+            # Force-field definition
+            special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0
+            pair_style      {}
+            pair_modify     shift yes mix sixthpower
+            bond_style      {}
+            angle_style     {}
+            dihedral_style  {}
+            improper_style  {}
+
+            # Data, settings, and log files setup
+            read_data {}
+            include {}
+            log {}.lammps.log
+            thermo_style custom {}
+            thermo_modify format float %14.6f
+            thermo {}
+
+            # Thermodynamic averages file setup
+            # "Nevery Nrepeat Nfreq": On every "Nfreq" steps, take the averages by using "Nrepeat" previous steps, counted every "Nevery"
+            {}            fix averages all ave/time {} {} {} v_calc_{} file {}.thermo.avg format %20.10g
+            """.format(
+                self.units, self.dimension, self.newton, self.atom_style, self.neigh_modify,
+                self.pair_style, self.bond_style, self.angle_style, self.dihedral_style, self.improper_style,
+                self.data_file_name, self.settings_file_name, self.prefix, ' '.join(self.thermo_keywords), self.thermo_freq,
+                "            ".join(["variable calc_{} equal {}\n".format(k,k) for k in self.thermo_keywords]),
+                self.avg_stepsize, self.avg_number_of_steps, self.avg_calculate_every, ' v_calc_'.join(self.thermo_keywords), self.prefix
+            )))
+        
+        for run_idx,run_name in enumerate(self.run_names):
+            file.write(self.generate_run_lines(
+                run_name,
+                self.run_styles[run_idx],
+                self.run_timesteps[run_idx],
+                self.run_steps[run_idx],
+                self.run_temperatures[run_idx],
+                self.run_pressure_volumes[run_idx]))
+
+        file.write(
+            dedent("""\
+                   
+            #===========================================================
+            # Clean and exit
+            #===========================================================
+
+            unfix averages
+            """
+        ))
+        if self.write_final_data:
+            file.write('write_data {}.end.data\n'.format(self.prefix))
+        if self.write_final_data:
+            file.write('write_restart {}.end.restart'.format(self.prefix))
+
+        file.close()
+        return
