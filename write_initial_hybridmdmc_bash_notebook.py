@@ -87,6 +87,9 @@ rm {}.log
 # System prep
 python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc_notebook.py {} {} -filename_notebook {} &&
 mpirun -np {} /depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in {}.in.init > {}.lammps.out &&
+if [ $? != 0 ]; then
+    exit 1
+fi
 cp {}.in.init               {}_prep.in.init
 cp {}.in.data               {}_prep.in.data
 cp {}.end.data              {}_prep.end.data
@@ -108,6 +111,9 @@ for i in `seq 0 2000`; do
 
     # Run MD
     mpirun -np {} /depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in {}.in.init > {}.lammps.out &&
+    if [ $? != 0 ]; then
+        exit 1
+    fi
 
 done
 
