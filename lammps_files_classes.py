@@ -327,8 +327,8 @@ class LammpsInitHandler:
             file.write(self.generate_run_lines(
                 run_name,
                 self.run_style[run_idx],
-                self.run_steps[run_idx],
                 self.run_stepsize[run_idx],
+                self.run_steps[run_idx],
                 self.run_temperature[run_idx],
                 self.run_pressure_volume[run_idx]))
 

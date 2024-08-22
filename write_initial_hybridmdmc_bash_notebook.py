@@ -32,6 +32,8 @@ def main(argv):
                         help='Number of cores on which to run (int). Defualt: 16')
     parser.add_argument('-timelim', dest='timelim', type=str, default='06:00:00',
                         help='Time limit of run (str). Default: 03:00:00')
+    parser.add_argument('-reactive_loops', dest='reactive_loops', type=int, default=2000,
+                        help='Number of reactive loops.')
     parser.add_argument('--serial', action='store_true')
     parser.add_argument('--synchronousparallel', dest='serial', action='store_false')
     parser.set_defaults(serial=True)
@@ -101,7 +103,7 @@ cp {}.density.lammpstrj     {}_prep.density.lammpstrj
 cp {}.diffusion.lammpstrj   {}_prep.diffusion.lammpstrj
 
 # Reactive loop
-for i in `seq 0 2000`; do
+for i in `seq 0 {}`; do
 
     # Run RMD script
     python3 {} {} {} -filename_notebook {} &&
@@ -125,6 +127,7 @@ echo "End time: $(date)"
     args.cores, args.prefix, args.prefix,
     args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
     args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
+    args.reactive_loops,
     mainscript, args.system, args.prefix, args.filename_notebook,
     args.cores, args.prefix, args.prefix
 ))
