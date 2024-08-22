@@ -155,6 +155,7 @@ def get_rxns_serial(molecules,voxelID2idx,diffusion_rate,rxnscaling,rxn_data,min
                         rxn_data[rxn_type]['rawrate']*rxnscaling.loc[cycle,rxn_type] # reactione event rate
                     ]
                     for reaction_index,molecule_index in enumerate(reactive_molecule_idxs_i)})
+            number_of_reactions = len(reactions)
             continue
 
         # Bimolecular reactions

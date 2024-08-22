@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.distance import *
 from copy import deepcopy
 from hybrid_mdmc.data_file_parser import parse_data_file
-from hybrid_mdmc.lammps_files_classes import write_lammps_data, write_lammps_init
+from hybrid_mdmc.lammps_files_classes import write_lammps_data, LammpsInitHandler
 from hybrid_mdmc.customargparse import HMDMC_ArgumentParser
 from hybrid_mdmc.classes import *
 from hybrid_mdmc.parsers import *
@@ -24,29 +24,18 @@ def main(argv):
 
     # Use HMDMC_ArgumentParser to parse the command line.
     parser = HMDMC_ArgumentParser()
-    parser.HMDMC_parse_args()
-    parser.adjust_default_args()
     args = parser.args
 
     # Read in the data_file, diffusion_file, rxndf, and msf files.
     atoms, bonds, angles, dihedrals, impropers, box, adj_mat, extra_prop = parse_data_file(
-        args.data_file, unwrap=True, atom_style=args.atom_style)
-    rxndata = parse_rxndf(args.rxndf)
-    masterspecies = parse_msf(args.msf)
-    data_header = parse_header(args.header)
+        args.filename_data, unwrap=True, atom_style=args.atom_style)
+    rxndata = parser.get_reaction_data_dict()
+    masterspecies = parser.get_masterspecies_dict()
+    data_header = parser.get_data_header_dict()
     rxnmatrix = get_rxnmatrix(rxndata, masterspecies)
 
     if args.debug:
         breakpoint()
-
-    # if in reduced units, convert temp to K
-    # T* = kB * T / e
-    # e is epsilon (LJ parameter)
-    # assuming that e = 1.0 kcal / mol
-    BoltzmannConstant = 1.987204259e-3 # kcal / (K mol)
-    Epsilon = 1.0 # kcal / mol
-    if args.lammps_units == 'lj':
-        args.temp = args.temp * Epsilon / BoltzmannConstant # K
 
     # Calculate the raw reaction rate for each reaction using the
     # Eyring equation. Ea is expected to be in kcal/mol, temperature is
@@ -55,9 +44,9 @@ def main(argv):
     R = 0.00198588  # kcal/mol/K
     for r in rxndata.keys():
         rxndata[r]['rawrate'] = \
-            rxndata[r]['A'][0] * \
-            args.temp**rxndata[r]['b'][0] * \
-            np.exp(-rxndata[r]['Ea'][0]/args.temp/R)
+            rxndata[r]['A'] * \
+            args.temperature_rxn**rxndata[r]['b'] * \
+            np.exp(-rxndata[r]['Ea']/args.temperature_rxn/R)
 
     if args.debug:
         breakpoint()
@@ -65,7 +54,7 @@ def main(argv):
     # Create a voxels dictionary and related voxel mapping parameters
     # using the calc_voxels function and the datafile information.
     voxels = calc_voxels(
-        args.num_voxels, box,
+        args.number_of_voxels, box,
         xbounds=args.x_bounds,
         ybounds=args.y_bounds,
         zbounds=args.z_bounds)
@@ -82,11 +71,11 @@ def main(argv):
     # Check for consistency among the tracking files.
     tfs = [
         os.path.exists(f)
-        for fidx, f in enumerate([args.conc_file, args.scale_file, args.log_file, args.diffusion_file])
+        for fidx, f in enumerate([args.filename_concentration, args.filename_scale, args.filename_log, args.filename_diffusion])
         if [True, args.scalerates, args.log, True][fidx]
     ]
     if len(set(tfs)) != 1:
-        tf_names = [args.conc_file, args.scale_file, args.log_file, args.diffusion_file]
+        tf_names = [args.filename_concentration, args.filename_scale, args.filename_log, args.filename_diffusion]
         tf_requested = [True, args.scalerates, args.log, True]
         print('Error! Inconsistent exsitence of tracking files.')
         print('  File Name                Requested   Exists')
@@ -102,10 +91,10 @@ def main(argv):
 
     # Create/append the tracking files.
     for f in [
-        (True, args.conc_file),
-        (args.scalerates, args.scale_file),
-        (args.log, args.log_file),
-        (True, args.diffusion_file)
+        (True, args.filename_concentration),
+        (args.scalerates, args.filename_scale),
+        (args.log, args.filename_log),
+        (True, args.filename_diffusion)
     ]:
         if f[0]:
             lines, new = [], False
@@ -153,14 +142,14 @@ def main(argv):
         data={_: 1 for _ in rxndata.keys()}
     )
     if args.scalerates:
-        counts, times, selected_rxns = parse_concentration(args.conc_file)
+        counts, times, selected_rxns = parse_concentration(args.filename_concentration)
         if counts == 'kill':
             quit()
         progression, MDMCcycles_progression = get_progression(
             counts, times, selected_rxns,
             [0]+list(sorted(rxndata.keys())),
             list(sorted(masterspecies.keys())))
-        rxnscaling, MDMCcycles_scaling = parse_scale(args.scale_file)
+        rxnscaling, MDMCcycles_scaling = parse_scale(args.filename_scale)
 
     # Check that the progression and scale files are consistent.
     if not np.all(
@@ -214,19 +203,19 @@ def main(argv):
         breakpoint()
     if not args.well_mixed:
         diffusion_rate = calc_diffusionrate(
-            args.trj_file,
+            args.filename_trajectory,
             atoms,
             box,
             #reactivespecies,
             masterspecies,
-            args.num_voxels,
+            args.number_of_voxels,
             xbounds=args.x_bounds,
             ybounds=args.y_bounds,
             zbounds=args.z_bounds
         )
 
     # Append the diffusion file
-    with open(args.diffusion_file,'a') as f:
+    with open(args.filename_diffusion,'a') as f:
         for k,v in sorted(diffusion_rate.items()):
             f.write('\nDiffusion Rates for {}\n'.format(k))
             for row in v:
@@ -239,6 +228,9 @@ def main(argv):
     Reacting, rxn_cycle = True, 1
     while Reacting:
 
+        if args.debug:
+            breakpoint()
+
         # Perform reaction scaling, if requested.
         if args.scalerates:
             PSSrxns = get_PSSrxns(
@@ -246,9 +238,9 @@ def main(argv):
                 progression,
                 args.windowsize_slope,
                 args.windowsize_rxnselection,
-                args.scalingcriteria_concentration_slope,
-                args.scalingcriteria_concentration_cycles,
-                args.scalingcriteria_rxnselection_count
+                args.scaling_criteria_concentration_slope,
+                args.scaling_criteria_concentration_cycles,
+                args.scaling_criteria_rxnselection_count
             )
             rxnscaling = scalerxns(
                 rxnscaling,
@@ -267,9 +259,13 @@ def main(argv):
             molecules, voxelID2idx, diffusion_rate,
             rxnscaling, rxndata, args.diffusion_cutoff)
 
+
+        if args.debug:
+            breakpoint()
+
         # Execute reaction(s)
         add, delete, dt, selected_rt = serial_kmc_rxn(
-            rxns, rxndata, molecules, translate_distance=2.0)
+            rxns, rxndata, molecules, translate_distance=0.5)
         molecount_current -= len(delete)
         selected_rxn_types += [selected_rt]
 
@@ -287,7 +283,7 @@ def main(argv):
 
         # If requested, print debugging information to the log file
         if args.log:
-            with open(args.log_file, 'a') as f:
+            with open(args.filename_log, 'a') as f:
                 for idx in range(len(molecules.ids)):
                     print('{} {} {} {}'.format(
                         molecules.ids[idx],
@@ -299,13 +295,12 @@ def main(argv):
                 f.write('delete: {}\n'.format(delete))
                 f.write('selected_rxn_types: {}\n\n'.format(selected_rxn_types))
 
-        # pdb breakpoint
-        if args.debug:
-            breakpoint()
-
         # Update the topology
         atoms, bonds, angles, dihedrals, impropers = update_topology(
             masterspecies, molecules, add, delete, atoms, bonds, angles, dihedrals, impropers)
+        
+        if args.debug:
+            breakpoint()
 
         # Create new molecules object
         molecules = gen_molecules(
@@ -327,7 +322,7 @@ def main(argv):
                  'SelectedReactionTypes {}\n'.format(
             ' '.join([str(i) for i in selected_rxn_types])),
             'Time {}\n'.format(dt)]
-        with open(args.conc_file, 'a') as f:
+        with open(args.filename_concentration, 'a') as f:
             for l in lines:
                 f.write(l)
 
@@ -335,7 +330,7 @@ def main(argv):
                  'ReactionTypes {}\n'.format(
                      ' '.join(['{}'.format(i) for i in sorted(rxndata.keys())])),
                  'ReactionScaling {}\n'.format(' '.join(['{}'.format(rxnscaling.loc[list(rxnscaling.index)[-1], i]) for i in sorted(rxndata.keys())]))]
-        with open(args.scale_file, 'a') as f:
+        with open(args.filename_scale, 'a') as f:
             for l in lines:
                 f.write(l)
 
@@ -361,43 +356,18 @@ def main(argv):
         if len(repeats) == 0:
             overlaps = False
 
-    # Write the resulting data and init files
-    if args.lammps_units == 'lj':
-        args.temp = 1.267
-        # args.temp = args.temp / Epsilon * BoltzmannConstant # unitless
-    init = {
-        'settings': args.settings,
-        'prefix': args.prefix,
-        'data': args.write_data,
-        'thermo_freq': 1000,
-        'avg_freq': 1000,
-        'dump4avg': 100,
-        'coords_freq': args.diffusion/1000,
-        'atom_style': args.atom_style,
-        'units': args.lammps_units,
-        'run_name': ['relax', 'equil', 'diffusion'],
-        'run_type': ['nve/limit', 'nvt', 'nvt'],
-        'run_steps': [args.relax, 0.2*args.diffusion, args.diffusion],
-        'run_temp': [[args.temp, args.temp, 10.0], [args.temp, args.temp, 100.0], [args.temp, args.temp, 100.0]],
-        'run_press': [[args.press, args.press, 100.0], [args.press, args.press, 100.0], [args.press, args.press, 100.0]],
-        'run_timestep': [0.25, 1.0, 1.0],
-        'restart': False,
-        'reset_steps': False,
-        'thermo_keywords': ['temp', 'press', 'ke', 'pe']}
-    init['pair_style'] = 'lj/cut 9.0'
-    init['kspace_style'] = None
-    init['angle_style'] = 'harmonic'
-    init['dihedral_style'] = 'opls'
-    init['improper_style'] = 'cvff'
-    init['neigh_modify'] = 'every 5 delay 0 check yes one 10000'
-    init['coords_freq'] = 20
-    if args.lammps_units == 'lj':
-        init['pair_style'] = 'lj/cut 3.0'
-        init['run_timestep'] = [0.00025, 0.001, 0.001]
-    write_lammps_data(args.write_data, atoms, bonds, angles, dihedrals,
+    # Write the LAMMPS data file
+    write_lammps_data(args.filename_writedata, atoms, bonds, angles, dihedrals,
                       impropers, box, header=data_header, charge=args.charged_atoms)
-    write_lammps_init(init, args.write_init, step_restarts=False,
-                      final_restart=False, final_data=True)
+    
+    # Write the LAMMPS init file
+    init_writer = LammpsInitHandler(
+        prefix = args.prefix,
+        settings_file_name = args.filename_settings,
+        data_file_name = args.filename_data,
+        **parser.cycled_MD_init_dict
+    )
+    init_writer.write()
 
     return
 
