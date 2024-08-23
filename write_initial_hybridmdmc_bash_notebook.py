@@ -98,8 +98,7 @@ cp {}.end.data              {}_prep.end.data
 cp {}.lammps.out            {}_prep.lammps.out
 cp {}.lammps.log            {}_prep.lammps.log
 cp {}.thermo.avg            {}_prep.thermo.avg
-cp {}.relax.lammpstrj       {}_prep.relax.lammpstrj
-cp {}.density.lammpstrj     {}_prep.density.lammpstrj
+cp {}.shrinklammpstrj       {}_prep.shrink.lammpstrj
 cp {}.diffusion.lammpstrj   {}_prep.diffusion.lammpstrj
 
 # Reactive loop
