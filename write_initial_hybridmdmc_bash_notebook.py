@@ -59,10 +59,6 @@ def main(argv):
 #SBATCH -n {}
 #SBATCH -t {}
 
-# Set environment variables
-export PATH="/depot/bsavoie/apps/openmpi/3.0.1/bin:$PATH"
-export LD_LIBRARY_PATH="/depot/bsavoie/apps/openmpi/3.0.1/lib:$LD_LIBRARY_PATH"
-
 # Adjust modules
 module --force purge
 module load intel/17.0.1.132
@@ -98,7 +94,7 @@ cp {}.end.data              {}_prep.end.data
 cp {}.lammps.out            {}_prep.lammps.out
 cp {}.lammps.log            {}_prep.lammps.log
 cp {}.thermo.avg            {}_prep.thermo.avg
-cp {}.shrinklammpstrj       {}_prep.shrink.lammpstrj
+cp {}.shrink.lammpstrj      {}_prep.shrink.lammpstrj
 cp {}.diffusion.lammpstrj   {}_prep.diffusion.lammpstrj
 
 # Reactive loop
@@ -124,8 +120,8 @@ echo "End time: $(date)"
     args.prefix, args.prefix, args.prefix, args.prefix,
     args.system, args.prefix, args.filename_notebook,
     args.cores, args.prefix, args.prefix,
-    args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
-    args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
+    args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
+    args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
     args.reactive_loops,
     mainscript, args.system, args.prefix, args.filename_notebook,
     args.cores, args.prefix, args.prefix

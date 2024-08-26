@@ -151,7 +151,7 @@ class HMDMC_ArgumentParser(ArgumentParser):
         # Species
         setattr(self, 'starting_species', {})
         setattr(self, 'masterspecies', {})
-        notebook['Species'].replace(['nan', '-'], np.nan, inplace=True).infer_objects(copy=False)
+        notebook['Species'].replace(['nan', '-'], np.nan, inplace=True)
         notebook['Species'].dropna(how='all', inplace=True)
         category_series = notebook['Species'].iloc[:,0]
         category_series.ffill(inplace=True)
