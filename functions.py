@@ -509,7 +509,7 @@ def get_progression(counts,times,selected_rxns,reaction_types,species,windowsize
     for r in reaction_types:
         data_[r] = [ selected_rxns[i[1][0]][i[1][1]].count(r) for i in mdmc_cycles ]
     for s in species:
-        data_[s] = [ counts[i[1][0]][i[1][1]][s] for i in mdmc_cycles ]
+        data_[s] = [ float(counts[i[1][0]][i[1][1]][s]) for i in mdmc_cycles ]
 
     # Create the progression DataFrame
     progression = pd.DataFrame( data=data_, columns=columns_, index=index_ )
@@ -529,7 +529,7 @@ def update_progression(progression,molecules,species,time,selected_rxns,windowsi
     for c in [_ for _ in progression.columns if type(_) == int]:
         add_data[c] = [selected_rxns.count(c)]
     for sp in species:
-        add_data[sp] = [len([ 1 for _ in molecules.mol_types if _ == sp ])]
+        add_data[sp] = [float(len([ 1 for _ in molecules.mol_types if _ == sp ]))]
     add_df = pd.DataFrame( data=add_data, index=add_index, columns=add_columns )
     add_df.loc[:,species[0]:species[-1]] = add_df.loc[:,species[0]:species[-1]].div(add_df.loc[:,species[0]:species[-1]].sum(axis=1),axis=0)
     progression = pd.concat([progression,add_df])
