@@ -101,7 +101,7 @@ cp {}.diffusion.lammpstrj   {}_prep.diffusion.lammpstrj
 for i in `seq 0 {}`; do
 
     # Run RMD script
-    python3 {} {} {} -filename_notebook {} &&
+    python3 {} {} {} -filename_notebook {} -diffusion_step ${{i}} &&
     if [ $? != 0 ]; then
         exit 1
     fi

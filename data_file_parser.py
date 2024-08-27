@@ -386,8 +386,8 @@ def parse_data_file(data_file, atom_style='full', preserve_atom_order=False, pre
         except KeyError:
             error_mass.append(atoms.ids[idx])
             elements_list.append('CG-{}'.format(atoms.lammps_type[idx]))
-    if len(error_mass)!=0:
-        print('Warning! Unknown mass for atom(s) {}.\nIf this is not a CG system, check the \"mass_to_element\" dictionary in data_file_parser, and/or your data file\'s atomic masses.'.format(error_mass))
+    #if len(error_mass)!=0:
+        #print('Warning! Unknown mass for atom(s) {}.\nIf this is not a CG system, check the \"mass_to_element\" dictionary in data_file_parser, and/or your data file\'s atomic masses.'.format(error_mass))
     atoms.append(element=elements_list)
 
     # Create the bonds object, sorting by bond id if the order is not being preserved.
