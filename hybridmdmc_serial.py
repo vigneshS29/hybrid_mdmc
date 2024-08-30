@@ -364,7 +364,7 @@ def main(argv):
     init_writer = LammpsInitHandler(
         prefix = args.prefix,
         settings_file_name = args.filename_settings,
-        data_file_name = args.filename_data,
+        data_file_name = args.filename_writedata,
         **parser.cycled_MD_init_dict
     )
     init_writer.write()

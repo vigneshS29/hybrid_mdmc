@@ -124,7 +124,7 @@ echo "End time: $(date)"
     args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
     args.reactive_loops,
     mainscript, args.system, args.prefix, args.filename_notebook,
-    args.cores, args.prefix, args.prefix
+    args.cores, args.prefix, args.prefix,
 ))
 
     return
