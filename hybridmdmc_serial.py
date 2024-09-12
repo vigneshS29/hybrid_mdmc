@@ -3,7 +3,7 @@
 #    Dylan Gilley
 #    dgilley@purdue.edu
 
-import os,sys,datetime
+import os,sys,datetime,math
 import numpy as np
 from scipy.spatial.distance import *
 from copy import deepcopy
@@ -338,6 +338,22 @@ def main(argv):
         rxn_cycle += 1
         add, delete, selected_rxn_types = {}, [], []
 
+    # Wrap atom coordinates back into the box
+    while not np.all(atoms.x >= box[0][0]):
+        atoms.x[atoms.x < box[0][0]] += (np.abs(box[0][1]) + np.abs(box[0][0]))
+    while not np.all(atoms.x <= box[0][1]):
+        atoms.x[atoms.x > box[0][1]] -= (np.abs(box[0][1]) + np.abs(box[0][0]))
+
+    while not np.all(atoms.y >= box[1][0]):
+        atoms.y[atoms.y < box[1][0]] += (np.abs(box[1][1]) + np.abs(box[1][0]))
+    while not np.all(atoms.y <= box[1][1]):
+        atoms.y[atoms.y > box[1][1]] -= (np.abs(box[1][1]) + np.abs(box[1][0]))
+
+    while not np.all(atoms.z >= box[2][0]):
+        atoms.z[atoms.z < box[2][0]] += (np.abs(box[2][1]) + np.abs(box[2][0]))
+    while not np.all(atoms.z <= box[2][1]):
+        atoms.z[atoms.z > box[2][1]] -= (np.abs(box[2][1]) + np.abs(box[2][0]))
+
     # Catch atomic overlaps
     overlaps = True
     while overlaps:
@@ -345,14 +361,16 @@ def main(argv):
         for idx_i,id_i in enumerate(atoms.ids):
             for idx_j,id_j in enumerate(atoms.ids):
                 if idx_i == idx_j: continue
-                if atoms.x[idx_i] != atoms.x[idx_j]: continue
-                if atoms.y[idx_i] != atoms.y[idx_j]: continue
-                if atoms.z[idx_i] != atoms.z[idx_j]: continue
+                if not math.isclose(atoms.x[idx_i], atoms.x[idx_j], rel_tol=1e-8): continue
+                if not math.isclose(atoms.y[idx_i], atoms.y[idx_j], rel_tol=1e-8): continue
+                if not math.isclose(atoms.z[idx_i], atoms.z[idx_j], rel_tol=1e-8): continue
                 repeats += [sorted((idx_i,idx_j))]
+        if len(repeats) != 0:
+            print('Found overlapping atoms! Removing {} overlaps...'.format(len(repeats)))
         for _ in repeats:
-            atoms.x[_[0]] += 0.01
-            atoms.y[_[0]] += 0.01
-            atoms.z[_[0]] += 0.01
+            atoms.x[_[0]] += 0.0001
+            atoms.y[_[0]] += 0.0001
+            atoms.z[_[0]] += 0.0001
         if len(repeats) == 0:
             overlaps = False
 

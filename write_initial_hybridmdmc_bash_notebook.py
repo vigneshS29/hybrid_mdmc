@@ -83,11 +83,8 @@ rm {}.diffusion
 rm {}.log
 
 # System prep
-python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc_notebook.py {} {} -filename_notebook {} &&
-mpirun -np {} /depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in {}.in.init > {}.lammps.out &&
-if [ $? != 0 ]; then
-    exit 1
-fi
+python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc_notebook.py {} {} -filename_notebook {}
+mpirun -np {} /depot/bsavoie/apps/lammps-29Sep2021/exe/lmp_mpi  -in {}.in.init > {}.lammps.out
 cp {}.in.init               {}_prep.in.init
 cp {}.in.data               {}_prep.in.data
 cp {}.end.data              {}_prep.end.data
@@ -100,17 +97,25 @@ cp {}.diffusion.lammpstrj   {}_prep.diffusion.lammpstrj
 # Reactive loop
 for i in `seq 0 {}`; do
 
+    echo "Loop step ${{i}}"
+
     # Run RMD script
-    python3 {} {} {} -filename_notebook {} -diffusion_step ${{i}} &&
-    if [ $? != 0 ]; then
-        exit 1
+    echo "  running hybridmdmc..."
+    python3 {} {} {} -filename_notebook {} -diffusion_step ${{i}}
+    retVal=$?
+    if [ $retVal -ne 0 ]; then
+        exit $retVal
     fi
 
     # Run MD
-    mpirun -np {} /depot/bsavoie/apps/lammps/exe/lmp_mpi_190322 -in {}.in.init > {}.lammps.out &&
-    if [ $? != 0 ]; then
-        exit 1
+    echo "  running MD..."
+    mpirun -np {} /depot/bsavoie/apps/lammps-29Sep2021/exe/lmp_mpi -in {}.in.init > {}.lammps.out
+    retVal=$?
+    if [ $retVal -ne 0 ]; then
+        exit $retVal
     fi
+
+    echo ""
 
 done
 

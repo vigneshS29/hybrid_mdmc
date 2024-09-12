@@ -254,6 +254,12 @@ class LammpsInitHandler:
             """.format(name,temperature)).rstrip()
             fixes += ["{}".format(name)]
 
+        if style == 'nve':
+            lines += dedent("""
+            fix {} all nve
+            """.format(name)).rstrip()
+            fixes += ["{}".format(name)]
+
         lines += dedent("""
         run {}
         """.format(steps)).rstrip()
