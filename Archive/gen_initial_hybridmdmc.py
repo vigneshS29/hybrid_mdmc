@@ -4,30 +4,57 @@
 #    dgilley@purdue.edu
 
 
-import sys,random
+import sys,argparse,time,random
 import numpy as np
+from copy import copy,deepcopy
 from mol_classes import AtomList,IntraModeList
-from lammps_files_classes import write_lammps_data,LammpsInitHandler
-from hybrid_mdmc.customargparse import HMDMC_ArgumentParser
+from lammps_files_classes import write_lammps_data,write_lammps_init,LammpsInitHandler
+from parsers import parse_msf,parse_header
 
 
 def main(argv):
 
-    # Use HMDMC_ArgumentParser to parse the command line.
-    parser = HMDMC_ArgumentParser()
-    #parser.HMDMC_parse_args()
-    #parser.adjust_default_args()
-    args = parser.args
+    parser = argparse.ArgumentParser('Generate systems for running in hybridmdmc')
+
+    # Positional arguments
+    parser.add_argument(dest='system')
+
+    parser.add_argument(dest='prefix')
+    
+    parser.add_argument(dest='molecule_types')
+
+    parser.add_argument(dest='molecule_counts')
+
+    # Optional arguments
+    parser.add_argument('-msf', dest='msf', default='', type=str,
+                        help='Name of the .msf file. If not specififed, script will default to prefix.msf')
+
+    parser.add_argument('-header', dest='header', default='', type=str,
+                        help='Name of the .header file. If not specififed, script will default to prefix.header')
+    
+    parser.add_argument('-pressure', dest='pressure', default='1', type=str)
+    parser.add_argument('-temp', dest='temp', default='188', type=str)
+    parser.add_argument('-lammps_units', dest='lammps_units', default='real', type=str)
+    parser.add_argument('-atom_style', dest='atom_style', default='full', type=str)
+
+    # Parse and store the inputs
+    args = parser.parse_args()
+    args.molecule_types = [_ for _ in args.molecule_types.split()]
+    args.molecule_counts = [int(_) for _ in args.molecule_counts.split()]
+    if not args.msf:
+        args.msf = args.system + '.msf'
+    if not args.header:
+        args.header = args.system + '.header'
+    args.pressure = float(args.pressure)
+    args.temp = float(args.temp)
 
     # Read in the .msf and .header files
-    msf = parser.get_masterspecies_dict()
-    header = parser.get_data_header_dict()
+    msf = parse_msf(args.msf)
+    header = parse_header(args.header)
     atomtype2mass = {_[0]:_[1] for _ in header['masses']}
-    molecule_types = sorted(list(parser.starting_species.keys()))
-    molecule_counts = [parser.starting_species[k] for k in molecule_types]
 
     # Determine the necessary box dimensions
-    nodes_perside = int(np.ceil(np.sum([ molecule_counts[idx]*len(msf[_]['Atoms']) for idx,_ in enumerate(molecule_types) ])**(1./3.)))
+    nodes_perside = int(np.ceil(np.sum([ args.molecule_counts[idx]*len(msf[_]['Atoms']) for idx,_ in enumerate(args.molecule_types) ])**(1./3.)))
     spacing = 6 # angstrom
     box_length = (nodes_perside+2)*spacing
     centers = np.array([[x,y,z]
@@ -38,7 +65,7 @@ def main(argv):
     # Place the molecules
     centers_order = list(range(len(centers)))
     random.shuffle(centers_order)
-    molecules = [i for idx,_ in enumerate(molecule_types) for i in [_]*molecule_counts[idx] ]
+    molecules = [i for idx,_ in enumerate(args.molecule_types) for i in [_]*args.molecule_counts[idx] ]
     random.shuffle(molecules)
     atoms = {}
     interactions = {'Bonds':{},'Angles':{},'Dihedrals':{},'Impropers':{}}
@@ -95,7 +122,7 @@ def main(argv):
 
     # Write the LAMMPS data file
     write_lammps_data(
-        args.filename_writedata,
+        args.prefix+'.in.data',
         atoms,
         interaction_instances['Bonds'],
         interaction_instances['Angles'],
@@ -108,10 +135,35 @@ def main(argv):
 
     # Write the LAMMPS init file
     init_writer = LammpsInitHandler(
-        prefix = parser.args.prefix,
-        settings_file_name = parser.args.filename_settings,
-        data_file_name = parser.args.filename_writedata,
-        **parser.initial_MD_init_dict
+        prefix = args.prefix,
+        settings_file_name = args.system + '.in.settings',
+        data_file_name = args.prefix + '.in.data',
+        thermo_freq = 100,
+        coords_freq = 100,
+        avg_calculate_every = 50,
+        avg_number_of_steps = 10,
+        avg_stepsize = 5,
+        units = 'lj',
+        atom_style = 'full',
+        dimension = 3,
+        newton = 'on',
+        pair_style = 'lj/cut 3.0',
+        bond_style =  'harmonic',
+        angle_style =  'harmonic',
+        dihedral_style =  'opls',
+        improper_style =  'cvff',
+        run_names = ['shrink','diffusion'],
+        run_styles = ['nvt deform','nvt'],
+        run_steps = [15000,50000],
+        run_temperatures = ['1.267 1.267 0.425','1.267 1.267 0.425'],
+        run_pressure_volumes = ['1 x final -5.25 5.25 y final -5.25 5.25 z final -5.25 5.25 units box',''],
+        run_timesteps = [0.001,0.001],
+        thermo_keywords = ['temp', 'press', 'ke', 'pe', 'ebond', 'evdwl'],
+        neigh_modify = 'every 5 delay 0 check no one 10000',
+        write_trajectories = True,
+        write_intermediate_restarts = False,
+        write_final_data = True,
+        write_final_restarts = True,
     )
     init_writer.write()
 

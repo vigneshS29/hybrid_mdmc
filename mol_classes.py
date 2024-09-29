@@ -169,7 +169,7 @@ class AtomList():
 
     # Get ids based on a specific value of an attribute
     def get_idx(self, ids=[], lammps_type=[], taffi_type=[], element=[], mass=[], charge=[], mol_id=[], mol_type=[]):
-        if ids!=[]:
+        if len(ids):
             return [_ for _,v in enumerate(self.ids) if v in ids]
         if lammps_type!=[]:
             return [_ for _,v in enumerate(self.lammps_type) if v in lammps_type]

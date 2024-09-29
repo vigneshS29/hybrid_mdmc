@@ -218,6 +218,9 @@ class LammpsInitHandler:
         fixes = []
         dumps = []
 
+        if style == 'other':
+            return "\n{}\n".format(pressure_volume)
+
         lines = dedent("""
         #===========================================================
         # {} ({})

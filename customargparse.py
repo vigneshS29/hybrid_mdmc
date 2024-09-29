@@ -16,7 +16,7 @@ class HMDMC_ArgumentParser(ArgumentParser):
         self.add_default_args()
         self.args = self.parse_args()
         if self.args.filename_notebook == 'default':
-            self.args.filename_notebook = self.args.system + '.xlsx'
+            self.args.filename_notebook = self.args.system + '_notebook.xlsx'
         if os.path.isfile(self.args.filename_notebook):
             self.read_notebook()
         self.adjust_default_args()
@@ -244,7 +244,7 @@ class HMDMC_ArgumentParser(ArgumentParser):
         if self.args.filename_writeinit == 'default':
             self.args.filename_writeinit = self.args.prefix+'.in.init'
         if self.args.filename_trajectory == 'default':
-            self.args.filename_trajectory = self.args.prefix+'.lammpstrj'
+            self.args.filename_trajectory = self.args.prefix+'.diffusion.lammpstrj'
         if self.args.filename_concentration == 'default':
             self.args.filename_concentration = self.args.prefix+'.concentration'
         if self.args.filename_log == 'default':

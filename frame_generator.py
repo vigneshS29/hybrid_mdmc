@@ -4,7 +4,7 @@ import sys,argparse,subprocess,os,time,math,shutil
 from matplotlib import pyplot as plt
 from copy import deepcopy
 import numpy as np
-from mol_classes import AtomList
+from hybrid_mdmc.mol_classes import AtomList
 
 def main(argv):
    
@@ -114,8 +114,8 @@ def frame_generator(name,start=0,end=-1,every=1,unwrap=False,adj_list=None,retur
                         # read in all properties
                         prop = { _: [ -1 for k in range(N_atoms)] for _ in fields[2:] } 
                         ind_dict = { _:fields.index(_)-2 for _ in fields[2:]} #key: property name in lammpstrj, value: field index
-                        if frame_count == 0:
-                           print("The following properties are found in lammpstrj file: {}".format(' '.join(list(ind_dict.keys()))))
+                        #if frame_count == 0:
+                        #   print("The following properties are found in lammpstrj file: {}".format(' '.join(list(ind_dict.keys()))))
                         continue
                     if len(fields) > 2 and fields[1] == "NUMBER":                        
                         N_atom_flag = 1

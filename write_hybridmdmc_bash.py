@@ -34,16 +34,16 @@ def main(argv):
                         help='Time limit of run (str). Default: 03:00:00')
     parser.add_argument('-reactive_loops', dest='reactive_loops', type=int, default=2000,
                         help='Number of reactive loops.')
-    parser.add_argument('--serial', action='store_true')
-    parser.add_argument('--synchronousparallel', dest='serial', action='store_false')
-    parser.set_defaults(serial=True)
+    #parser.add_argument('--serial', action='store_true')
+    #parser.add_argument('--synchronousparallel', dest='serial', action='store_false')
+    #parser.set_defaults(serial=True)
     
     # Parse the line arguments
     args = parser.parse_args()
     
     mainscript = '~/bin/hybrid_mdmc/hybridmdmc.py'
-    if args.serial:
-        mainscript = '~/bin/hybrid_mdmc/hybridmdmc_serial.py'
+    #if args.serial:
+    #    mainscript = '~/bin/hybrid_mdmc/hybridmdmc_serial.py'
 
     # Write the bash file
     with open(args.prefix+'_hmdmc.sh', 'w') as f:
@@ -60,10 +60,9 @@ def main(argv):
 #SBATCH -t {}
 
 # Adjust modules
-module --force purge
-module load intel/17.0.1.132
-export MKL_DEBUG_CPU_TYPE=5
-export MKL_CBWR=AUTO
+module load gcc/12.2.0
+module load openmpi/4.1.4
+module load lammps/20220623
 
 # Write out job information
 echo "Running on host: $SLURM_NODELIST"
@@ -77,14 +76,9 @@ cd $SLURM_SUBMIT_DIR
 # Run script
 echo "Start time: $(date)"
 
-rm {}.concentration
-rm {}.scale
-rm {}.diffusion
-rm {}.log
-
 # System prep
-python3 ~/bin/hybrid_mdmc/gen_initial_hybridmdmc_notebook.py {} {} -filename_notebook {}
-mpirun -np {} /depot/bsavoie/apps/lammps-29Sep2021/exe/lmp_mpi  -in {}.in.init > {}.lammps.out
+python ~/bin/hybrid_mdmc/gen_initial_hybridmdmc.py {} {} -filename_notebook {}
+mpirun -n {} lmp -in {}.in.init > {}.lammps.out
 cp {}.in.init               {}_prep.in.init
 cp {}.in.data               {}_prep.in.data
 cp {}.end.data              {}_prep.end.data
@@ -97,19 +91,27 @@ cp {}.diffusion.lammpstrj   {}_prep.diffusion.lammpstrj
 # Reactive loop
 for i in `seq 0 {}`; do
 
-    echo "Loop step ${{i}}"
+    echo "Loop step ${{i}} ($(date)) "
+
+    # Calculate MSD
+    echo "  calculating msd ($(date)) ..."
+    python ~/bin/hybrid_mdmc/calculate_MSD.py {}.in.data {}.diffusion.lammpstrj 1 -frames '500 10 1000' -filename_output {}.msdoutput.${{i}}.txt
+    retVal=$?
+    if [ $retVal -ne 0 ]; then
+        exit $retVal
+    fi
 
     # Run RMD script
-    echo "  running hybridmdmc..."
-    python3 {} {} {} -filename_notebook {} -diffusion_step ${{i}}
+    echo "  running hybridmdmc ($(date)) ..."
+    python {} {} {} -filename_notebook {} -diffusion_step ${{i}}
     retVal=$?
     if [ $retVal -ne 0 ]; then
         exit $retVal
     fi
 
     # Run MD
-    echo "  running MD..."
-    mpirun -np {} /depot/bsavoie/apps/lammps-29Sep2021/exe/lmp_mpi -in {}.in.init > {}.lammps.out
+    echo "  running MD ($(date)) ..."
+    mpirun -n {} lmp -in {}.in.init > {}.lammps.out
     retVal=$?
     if [ $retVal -ne 0 ]; then
         exit $retVal
@@ -122,12 +124,12 @@ done
 echo "End time: $(date)"
 """.format(
     args.prefix+'_hmdmc', args.prefix+'_hmdmc', args.prefix+'_hmdmc', args.queue, args.nodes, args.cores, args.timelim,
-    args.prefix, args.prefix, args.prefix, args.prefix,
     args.system, args.prefix, args.filename_notebook,
     args.cores, args.prefix, args.prefix,
     args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
     args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix, args.prefix,
     args.reactive_loops,
+    args.prefix, args.prefix, args.prefix,
     mainscript, args.system, args.prefix, args.filename_notebook,
     args.cores, args.prefix, args.prefix,
 ))
