@@ -515,8 +515,8 @@ def get_progression(counts,times,selected_rxns,reaction_types,species,windowsize
     progression = pd.DataFrame( data=data_, columns=columns_, index=index_ )
 
     # Change from molecule counts to molecule number fraction
-    progression.loc[:,species[0]:species[-1]] = progression.loc[:,species[0]:species[-1]].div(
-        progression.loc[:,species[0]:species[-1]].sum(axis=1),axis=0)
+    #progression.loc[:,species[0]:species[-1]] = progression.loc[:,species[0]:species[-1]].div(
+    #    progression.loc[:,species[0]:species[-1]].sum(axis=1),axis=0)
 
     return progression,mdmc_cycles
 
@@ -531,7 +531,7 @@ def update_progression(progression,molecules,species,time,selected_rxns,windowsi
     for sp in species:
         add_data[sp] = [float(len([ 1 for _ in molecules.mol_types if _ == sp ]))]
     add_df = pd.DataFrame( data=add_data, index=add_index, columns=add_columns )
-    add_df.loc[:,species[0]:species[-1]] = add_df.loc[:,species[0]:species[-1]].div(add_df.loc[:,species[0]:species[-1]].sum(axis=1),axis=0)
+    #add_df.loc[:,species[0]:species[-1]] = add_df.loc[:,species[0]:species[-1]].div(add_df.loc[:,species[0]:species[-1]].sum(axis=1),axis=0)
     progression = pd.concat([progression,add_df])
     if progression.shape[0] > windowsize_MDMCcycles:
         progression = progression.drop(labels=progression.index[0],axis=0)
@@ -659,7 +659,7 @@ def scalerxns(
 
     # If the number of cycles that have passed since the last scaling factor was adjusted
     # is less than the windowsize_scalingpause, return unscaled reactions.
-    if np.min([get_cyclesofconstantscaling(reaction_scaling[:,rxntype].to_numpy()) for rxntype in reaction_scaling.columns]) < windowsize_scalingpause:
+    if np.min([get_cyclesofconstantscaling(reaction_scaling.loc[:,rxntype].to_numpy()) for rxntype in reaction_scaling.columns]) < windowsize_scalingpause:
         reaction_scaling.loc[lastcycle+1] = [1.0 for _ in reaction_scaling.columns]
         return reaction_scaling
 
