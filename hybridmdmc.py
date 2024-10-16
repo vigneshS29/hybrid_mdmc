@@ -244,7 +244,6 @@ def main(argv):
             )
             rxnscaling = scalerxns(
                 rxnscaling,
-                progression,
                 PSSrxns,
                 args.windowsize_scalingpause,
                 args.scalingfactor_adjuster,

@@ -600,15 +600,17 @@ def get_PSSrxns(
     
     # Reset the windowsize_rxnselection if it is greater than the length of
     # the progression df.
-    if windowsize_rxnselection > len(progression):
-        windowsize_rxnselection = len(progression)
+    windowsize_rxnselection = np.min([windowsize_rxnselection,len(progression)])
 
     # For each species, determine the number of cycles that have occured
     # for which the slope of the concentration has met the
     # scalingcriteria_concentration_slope criteria.
-    cyclesofconstantconcentration = {
-        _:get_cyclesofconstantslope(
-            progression,_,windowsize_slope,scalingcriteria_concentration_slope)
+    cycles_of_constant_slope = {
+        _:get_cycles_of_constant_slope(
+            progression.loc[:,_].to_numpy(),
+            windowsize_slope,
+            scalingcriteria_concentration_slope,
+            number_of_windows=scalingcriteria_concentration_cycles)
         for _ in progression.columns if _ != 'time' and type(_) == str
     }
 
@@ -623,7 +625,7 @@ def get_PSSrxns(
 
         # Check that all of the species for this reaction have an unchanging
         # slope of concentration. If not, exit the loop for this rxntype.
-        if not np.all(np.array([cyclesofconstantconcentration[_] for _ in species_rxn]) >= scalingcriteria_concentration_cycles):
+        if not np.all(np.array([cycles_of_constant_slope[_] for _ in species_rxn]) >= scalingcriteria_concentration_cycles):
             continue
 
         # Check that this rxntype has been selected the desired number
@@ -640,8 +642,7 @@ def get_PSSrxns(
 
 
 def scalerxns(
-        rxnscaling,
-        progression,
+        reaction_scaling,
         PSSrxns,
         windowsize_scalingpause,
         scalingfactor_adjuster,
@@ -650,31 +651,23 @@ def scalerxns(
     ):
 
     # Declare the last cycle
-    lastcycle = rxnscaling.index[-1]
+    lastcycle = reaction_scaling.index[-1]
 
     # Handle the default rxnlist
     if rxnlist == 'all':
-        rxnlist = sorted(list(rxnscaling.columns))
+        rxnlist = sorted(list(reaction_scaling.columns))
+
+    # If the number of cycles that have passed since the last scaling factor was adjusted
+    # is less than the windowsize_scalingpause, return unscaled reactions.
+    if np.min([get_cyclesofconstantscaling(reaction_scaling[:,rxntype].to_numpy()) for rxntype in reaction_scaling.columns]) < windowsize_scalingpause:
+        reaction_scaling.loc[lastcycle+1] = [1.0 for _ in reaction_scaling.columns]
+        return reaction_scaling
 
     # Create a dictionary to track the new reaction scaling
-    newscaling = {rxntype:rxnscaling.loc[lastcycle,rxntype] for rxntype in rxnscaling.columns}
-
-    # Loop over a list of the most recently selected reactions.
-    for rxntype in [_ for _ in progression.columns if _ != 0 and type(_) != str and progression.loc[lastcycle,_] != 0]:
-
-        # Unscale all reactions if an unscaled reaction that is NOT in
-        # PSS was selected
-        if rxnscaling.loc[lastcycle,rxntype] == 1.0 and rxntype not in PSSrxns:
-            rxnscaling.loc[rxnscaling.index[-1]+1] = [1.0 for _ in rxnscaling.columns]
-            return rxnscaling
+    newscaling = {rxntype:reaction_scaling.loc[lastcycle,rxntype] for rxntype in reaction_scaling.columns}
         
     # Loop over the rxnlist and scale reactions
     for rxntype in rxnlist:
-
-        # Check if this reaction has been (un)scaled within the last
-        # "windowsize_pause" number of MDMC cycles. If it has, skip it.
-        if get_cyclesofconstantscaling(rxnscaling,rxntype) <= windowsize_scalingpause:
-            continue
 
         # If this reaction is not in PSS, upscale it.
         if rxntype not in PSSrxns:
@@ -687,70 +680,105 @@ def scalerxns(
             continue
 
     # Append the new reaction scaling to rxnscaling
-    rxnscaling.loc[lastcycle+1] = [newscaling[rxntype] for rxntype in rxnscaling.columns]
+    reaction_scaling.loc[lastcycle+1] = [newscaling[rxntype] for rxntype in reaction_scaling.columns]
 
     # If all reactions are scaled, upscale
-    while not np.any(rxnscaling.loc[lastcycle+1] >= 1.0):
-        rxnscaling.loc[lastcycle+1] /= scalingfactor_adjuster
+    while not np.any(reaction_scaling.loc[lastcycle+1] >= 1.0):
+        reaction_scaling.loc[lastcycle+1] /= scalingfactor_adjuster
 
     # Adjust scalings that are outside of the scaling limits.
-    rxnscaling[rxnscaling > 1.0] = 1.0
-    rxnscaling[rxnscaling < scalingfactor_minimum] = scalingfactor_minimum
+    reaction_scaling[reaction_scaling > 1.0] = 1.0
+    reaction_scaling[reaction_scaling < scalingfactor_minimum] = scalingfactor_minimum
 
-    return rxnscaling
+    return reaction_scaling
 
 
-def get_cyclesofconstantscaling(rxnscaling,rxnnum):
+def get_cyclesofconstantscaling(
+        reaction_scaling: np.array
+        ) -> int:
+    """Determine the number of cycles that the scaling factor has remained constant.
+    
+    Given an array of reaction rate scaling factors, this
+    function calculates the number of steps that the scaling
+    factor has remained unchanged, counted from the most recent step.
 
-    # If the rxnscaling dataframe has no length, return a value of 0.
-    if len(rxnscaling) == 0:
+    Parameters
+    ----------
+    reaction_scaling : numpy array
+        An array of reaction rate scaling factors.
+
+    Returns
+    -------
+    int
+        The number of cycles that the scaling factor has remained constant.
+    
+    Edge Cases
+    ----------
+    If the reaction_scaling array has no length, return a value of 0.
+
+    If the reaction_scaling array has no changes, return the length of the array.
+
+    If the reaction_scaling changed between the previous step and the current step, return 1.
+        e.g. np.array([1.0,1.0,0.1]) returns 1.
+    """
+    if len(reaction_scaling) == 0:
         return 0
-
-    # Create an array holding the scaling factors of the reaction in
-    # question, in reverse order.
-    rxnscaling_reverse = np.array(rxnscaling.loc[:,rxnnum][::-1])
-
-    # If all of the scaling values for this reaction are the same,
-    # return the length of the rxnscaling dataframe.
-    if len(set(rxnscaling_reverse)) == 1:
-        return len(rxnscaling_reverse)
-
-    # Otherwise, determine how many cycles have occured since the last
-    # scaling or unscaling event (i.e. how many cycles have occurred
-    # since the scaling factor changed).
-    return np.argwhere(rxnscaling_reverse[1:] != rxnscaling_reverse[:-1])[0][0] + 1
+    change_indices = np.where(np.diff(reaction_scaling) != 0)[0] + 1
+    if len(change_indices) == 0:
+        return len(reaction_scaling)
+    return len(reaction_scaling) - change_indices[-1]
 
 
-def get_cyclesofconstantslope(progression,column,windowsize_slope,scalingcriteria_concentration_slope,steps=1e99):
+def get_cycles_of_constant_slope(
+        particle_count: np.array,
+        windowsize_slope: int,
+        scalingcriteria_concentration_slope: float,
+        number_of_windows: int=1,
+        ) -> int:
+    """Determine the number of cycles that the slope of the particle count has remained constant.
+
+    Parameters
+    ----------
+    particle_count : numpy.array
+        An array containing the particle count of a species over time.
+
+    windowsize_slope : int
+        The number of cycles to use when calculating the slope.
+
+    scalingcriteria_concentration_slope : float
+        The maximum slope of the concentration that is considered "constant".
+
+    number_of_windows : int
+        The number of windows over which to calculate the slope.
+
+    Returns
+    -------
+    int
+        The number of cycles that the slope of the concentration has remained constant.
+    """
 
     # If the progression dataframe has no length, return a value of 0.
-    if len(progression) == 0 or len(progression) < windowsize_slope:
+    if len(particle_count) == 0 or len(particle_count) < windowsize_slope:
         return 0
 
-    # Adust the steps
-    steps += windowsize_slope
-    if steps > len(progression):
-        steps = len(progression)
+    # Adjust the steps
+    steps = number_of_windows + windowsize_slope - 1
+    if steps > len(particle_count):
+        steps = len(particle_count)
+    particle_count = particle_count[-steps:]
 
-    # Create an array holding the concentration, in reverse order.
-    concentration_reverse = np.array(progression.loc[:,column][-steps:][::-1])
+    # Calculate the absolute value of the slopes using the provided window size.
+    slope = np.array([
+        np.abs(linear_model.LinearRegression().fit(
+            np.array(range(windowsize_slope)).reshape(-1, 1),
+            particle_count[idx:idx+windowsize_slope]
+            ).coef_[0])
+        for idx in range(0, len(particle_count) - windowsize_slope + 1)
+    ])
 
-    # Calculate the absolute value of the slopes using the provided
-    # window size, in reverse order.
-    slope_reverse = np.array([
-        np.abs(linear_model.LinearRegression().fit(np.array(range(windowsize_slope)).reshape(-1,1),concentration_reverse[idx:idx+windowsize_slope]).coef_[0])
-        for idx in range(0,len(concentration_reverse)-windowsize_slope+1)])
+    # If all of the cycles satisfy the scalingcriteria_concentration_slope, return the length of slope.
+    if np.all(slope <= scalingcriteria_concentration_slope):
+        return len(slope)
 
-    # If all of the cycles satisfy the
-    # scalingcriteria_concentration_slope, return the length of
-    # concentration_reverse - windowsize_slope + 1. Not catching this
-    # results in an error in the next step.
-    if np.all(slope_reverse <= scalingcriteria_concentration_slope):
-        return len(slope_reverse)
-
-    # Otherwise, return the index of the first instance where the
-    # slope of the reverse concentraiton does NOT satisfy
-    # scalingcriteria_concentraiton_slope. This represents the number of
-    # cycles, counting back from the current cycle, that satisfy the
-    # criteria.
-    return np.argwhere(slope_reverse > scalingcriteria_concentration_slope)[0][0]
+    # Otherwise, return the index of the first instance where the slope does NOT satisfy scalingcriteria_concentration_slope.
+    return np.argwhere(slope[::-1] > scalingcriteria_concentration_slope)[0][0]
