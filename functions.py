@@ -617,6 +617,7 @@ def get_PSSrxns(
     # Loop over the reactions, checking each for PSS based on the
     # desired criteria.
     PSSrxns = []
+    true_dynamics_steps = [idx for idx in progression.index[-windowsize_rxnselection:] if np.all(reaction_scaling.loc[idx] == 1.0)]
     for rxntype in [_ for _ in progression.columns if _ != 0 and type(_) != str]:
 
         # Create a list of all species involved in this reaction,
@@ -631,7 +632,8 @@ def get_PSSrxns(
         # Check that this rxntype has been selected the desired number
         # of times over the desired number of previous cycles. If not,
         # exit the loop for this rxntype.
-        if not np.sum(progression.loc[progression.index[-windowsize_rxnselection]:,rxntype]) >= scalingcriteria_rxnselection_count:
+        #if not np.sum(progression.loc[progression.index[-windowsize_rxnselection]:,rxntype]) >= scalingcriteria_rxnselection_count:
+        if not np.sum([progression.loc[idx,reaction_ID] for idx in true_dynamics_steps]) >= scalingcriteria_rxnselection_count:
             continue
 
         # If this point is reached, the reaction may be added to the
