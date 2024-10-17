@@ -235,6 +235,7 @@ def main(argv):
         if args.scalerates:
             PSSrxns = get_PSSrxns(
                 rxnmatrix,
+                rxnscaling,
                 progression,
                 args.windowsize_slope,
                 args.windowsize_rxnselection,

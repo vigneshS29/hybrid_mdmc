@@ -577,6 +577,7 @@ def get_rxnmatrix(rxndata,masterspecies):
 
 def get_PSSrxns(
         rxnmatrix,
+        reaction_scaling,
         progression,
         windowsize_slope,
         windowsize_rxnselection,
@@ -633,7 +634,7 @@ def get_PSSrxns(
         # of times over the desired number of previous cycles. If not,
         # exit the loop for this rxntype.
         #if not np.sum(progression.loc[progression.index[-windowsize_rxnselection]:,rxntype]) >= scalingcriteria_rxnselection_count:
-        if not np.sum([progression.loc[idx,reaction_ID] for idx in true_dynamics_steps]) >= scalingcriteria_rxnselection_count:
+        if not np.sum([progression.loc[idx,rxntype] for idx in true_dynamics_steps]) >= scalingcriteria_rxnselection_count:
             continue
 
         # If this point is reached, the reaction may be added to the
