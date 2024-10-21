@@ -4,6 +4,7 @@
 import argparse, datetime
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from hybrid_mdmc.functions import get_PSSrxns,scalerxns
 
 
@@ -18,7 +19,7 @@ def main():
     parser.add_argument('-products',  type=str, default= '1:B,   2:A,   3:B,   4:C,   5:B,   6:D')
     parser.add_argument('-rates',     type=str, default= '1:2e7, 2:2e7, 3:2e7, 4:2e7, 5:1e3, 6:2e4')
 
-    parser.add_argument('-steps', type=int, default=4000)
+    parser.add_argument('-steps', type=str, default='0 1001 1')
 
     parser.add_argument('-windowsize_slope', type=int, default=8)
     parser.add_argument('-scalingcriteria_concentration_slope', type=float, default=0.2)
@@ -31,6 +32,7 @@ def main():
 
     args = parser.parse_args()
 
+    args.steps = list(map(int, args.steps.split()))
     species = {_.split(':')[0].strip():float(_.split(':')[1]) for _ in args.species.split(',')}
     species_IDs = sorted(list(species.keys()))
     rates = {int(_.split(':')[0]):float(_.split(':')[1]) for _ in args.rates.split(',')}
@@ -57,33 +59,42 @@ def main():
         reaction_matrix.loc[rxn,reactants[rxn]] = -1
         reaction_matrix.loc[rxn,products[rxn]] = 1
 
-    progression, reaction_scaling = conduct_pure_kmc(
-        progression,
-        reaction_matrix,
-        reaction_scaling,
-        args.windowsize_slope,
-        args.windowsize_rxnselection,
-        args.windowsize_scalingpause,
-        args.scalingcriteria_concentration_slope,
-        args.scalingcriteria_concentration_cycles,
-        args.scalingcriteria_rxnselection_count,
-        args.scalingfactor_adjuster,
-        args.scalingfactor_minimum,
-        reactants,
-        products,
-        reaction_IDs,
-        rates,
-        species_IDs,
-        args.steps,
-    )
+    output_df = pd.concat([deepcopy(progression), deepcopy(reaction_scaling)],axis=1)
+    output_df.columns = ['time'] + species_IDs + [0] + reaction_IDs + ['{}rs'.format(rxn) for rxn in reaction_IDs]
 
     with open(args.name + '_KMCoutput.txt', 'w') as f:
-        f.write('KMC output\nWritten {}\n\n'.format(datetime.datetime.now()))
-        f.write('Progression\n')
-        f.write(progression.to_string())
-        f.write('\n\n')
-        f.write('Reaction scaling\n')
-        f.write(reaction_scaling.to_string())
+        f.write('KMC output\nWritten {}\n'.format(datetime.datetime.now()))
+
+    include_header=True
+    for step_list in [list(range(i, min(i + args.steps[2], args.steps[1]))) for i in range(args.steps[0], args.steps[1], args.steps[2])]:
+
+        progression, reaction_scaling = conduct_pure_kmc(
+            progression,
+            reaction_matrix,
+            reaction_scaling,
+            args.windowsize_slope,
+            args.windowsize_rxnselection,
+            args.windowsize_scalingpause,
+            args.scalingcriteria_concentration_slope,
+            args.scalingcriteria_concentration_cycles,
+            args.scalingcriteria_rxnselection_count,
+            args.scalingfactor_adjuster,
+            args.scalingfactor_minimum,
+            reactants,
+            products,
+            reaction_IDs,
+            rates,
+            species_IDs,
+            step_list,
+        )
+
+        output_df = pd.concat([progression.loc[step_list,:], reaction_scaling.loc[step_list,:]], axis=1)
+        output_df.columns = ['time'] + species_IDs + [0] + reaction_IDs + ['{}sc'.format(rxn) for rxn in reaction_IDs]
+
+        with open(args.name + '_KMCoutput.txt', 'a') as f:
+            f.write('\n')
+            f.write(output_df.to_string(header=include_header))
+        include_header = False
 
     return
 
@@ -116,10 +127,10 @@ def conduct_pure_kmc(
         reaction_IDs,
         rates,
         species_IDs,
-        total_steps,
+        provided_steps,
         ):
     
-    for step in range(total_steps):
+    for step in provided_steps:
 
         PSSrxns = get_PSSrxns(
             reaction_matrix,
