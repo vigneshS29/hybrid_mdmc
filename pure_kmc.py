@@ -17,7 +17,7 @@ def main():
     parser.add_argument('-species',   type=str, default= 'A:200, B:0, C:0, D:0')
     parser.add_argument('-reactants', type=str, default= '1:A,   2:B,   3:C,   4:B,   5:D,   6:B')
     parser.add_argument('-products',  type=str, default= '1:B,   2:A,   3:B,   4:C,   5:B,   6:D')
-    parser.add_argument('-rates',     type=str, default= '1:2e7, 2:2e7, 3:2e7, 4:2e7, 5:1e3, 6:2e4')
+    parser.add_argument('-rates',     type=str, default= '1:2e4, 2:2e4, 3:2e4, 4:2e4, 5:1e3, 6:2e4')
 
     parser.add_argument('-steps', type=str, default='0 1001 1')
 
@@ -90,11 +90,19 @@ def main():
 
         output_df = pd.concat([progression.loc[step_list,:], reaction_scaling.loc[step_list,:]], axis=1)
         output_df.columns = ['time'] + species_IDs + [0] + reaction_IDs + ['{}sc'.format(rxn) for rxn in reaction_IDs]
+        output_df['time'] = output_df['time'].apply(lambda x: f'{x:12.6e}')
+
 
         with open(args.name + '_KMCoutput.txt', 'a') as f:
             f.write('\n')
-            f.write(output_df.to_string(header=include_header))
+            f.write(output_df.to_string(
+                header=include_header,
+                formatters={'time': lambda x: f'{x:12.6e}'},
+                col_space={'time': 14,},
+                index=True
+            ))
         include_header = False
+        print(output_df.loc[step_list[-1],'time'])
 
     return
 
