@@ -60,16 +60,19 @@ def main(argv):
 #SBATCH -t {}
 
 # Adjust modules
+module purge
 module load gcc/12.2.0
 module load openmpi/4.1.4
 module load lammps/20220623
 
 # Write out job information
+echo "Slurm Job ID: $SLURM_JOB_ID"
 echo "Running on host: $SLURM_NODELIST"
 echo "Running on node(s): $SLURM_NNODES"
 echo "Number of processors: $SLURM_NPROCS"
 echo "Current working directory: $SLURM_SUBMIT_DIR"
-
+scontrol -dd show job $SLURM_JOB_ID | grep "CPU_IDs"
+            
 # User supplied shell commands
 cd $SLURM_SUBMIT_DIR
 
