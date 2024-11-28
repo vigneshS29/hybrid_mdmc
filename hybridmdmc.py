@@ -206,12 +206,13 @@ def main(argv):
             args.filename_trajectory,
             atoms,
             box,
-            #reactivespecies,
             masterspecies,
             args.number_of_voxels,
             xbounds=args.x_bounds,
             ybounds=args.y_bounds,
-            zbounds=args.z_bounds
+            zbounds=args.z_bounds,
+            lammps_stepsize=args.lammps_stepsize,
+            lammps_time_units_to_seconds_conversion=args.lammps_time_units_to_seconds_conversion,
         )
 
     # Append the diffusion file

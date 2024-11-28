@@ -186,7 +186,9 @@ def calc_diffusionrate(
         xbounds=[],
         ybounds=[],
         zbounds=[],
-        start=0,end=-1,every=1):
+        start=0,end=-1,every=1,
+        lammps_stepsize=1,
+        lammps_time_units_to_seconds_conversion=1e-15):
     """
     """
     # Calculate the voxels and voxel mapping objects based on the
@@ -242,8 +244,10 @@ def calc_diffusionrate(
     # create a DiffusionGraph object for the diffusion times. Creating
     # the rates object first will make a smaller object by not
     # including the transitions that have values of 0.
+    time_in_lammps_units = (timesteps[-1] - timesteps[0])*lammps_stepsize
+    time_in_seconds = time_in_lammps_units*lammps_time_units_to_seconds_conversion
     diffusion_rate = {
-        k: get_DiffusionGraph_from_matrix(v/(timesteps[-1] - timesteps[0]))
+        k: get_DiffusionGraph_from_matrix(v/(time_in_seconds))
         for k, v in voxel_transitions.items()
     }
     diffusion_time = {
