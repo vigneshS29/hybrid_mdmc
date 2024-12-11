@@ -61,7 +61,13 @@ def voxels2voxelsmap(voxels):
     return voxelsmap,np.array(x),np.array(y),np.array(z)
 
 
-def gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz):
+def gen_molecules(
+        atoms,
+        atomtypes2moltype,
+        voxelsmap=None,
+        voxelsx=None,
+        voxelsy=None,
+        voxelsz=None):
     """Creates an instance of the MoleculeList class
 
     Parameters
@@ -97,25 +103,29 @@ def gen_molecules(atoms,atomtypes2moltype,voxelsmap,voxelsx,voxelsy,voxelsz):
         molecules_dict[m]['atom_IDs'] = sorted(atoms.ids[idxs].tolist())
         molecules_dict[m]['cog'] = np.mean(np.array([atoms.x[idxs],atoms.y[idxs],atoms.z[idxs]]),axis=1)
         cog = molecules_dict[m]['cog']
-        # For assigning voxels, wrap the COG back into the simulation box
-        box = [ [voxelsx[0],voxelsx[-1]], [voxelsy[0],voxelsy[-1]], [voxelsz[0],voxelsz[-1]] ]
-        for i in range(3):
-            while cog[i] < box[i][0]:
-                cog[i] += box[i][1]-box[i][0]
-            while cog[i] > box[i][1]:
-                cog[i] -= box[i][1]-box[i][0]
+        if voxelsmap is not None:
+            # For assigning voxels, wrap the COG back into the simulation box
+            box = [ [voxelsx[0],voxelsx[-1]], [voxelsy[0],voxelsy[-1]], [voxelsz[0],voxelsz[-1]] ]
+            for i in range(3):
+                while cog[i] < box[i][0]:
+                    cog[i] += box[i][1]-box[i][0]
+                while cog[i] > box[i][1]:
+                    cog[i] -= box[i][1]-box[i][0]
+            molecules_dict[m]['voxel'] = voxelsmap[(
+                np.argwhere(voxelsx<=cog[0])[-1][0], 
+                np.argwhere(voxelsy<=cog[1])[-1][0],
+                np.argwhere(voxelsz<=cog[2])[-1][0] )][0]
         molecules_dict[m]['type'] = atomtypes2moltype[tuple(sorted(atoms.lammps_type[idxs]))]
-        molecules_dict[m]['voxel'] = voxelsmap[(
-            np.argwhere(voxelsx<=cog[0])[-1][0], 
-            np.argwhere(voxelsy<=cog[1])[-1][0],
-            np.argwhere(voxelsz<=cog[2])[-1][0] )][0]
     mkeys = sorted(list(molecules_dict.keys()))
+    voxels = []
+    if voxelsmap is not None:
+        voxels = [molecules_dict[m]['voxel'] for m in mkeys]
     return MoleculeList(
         ids=mkeys,
         atom_ids=[molecules_dict[m]['atom_IDs'] for m in mkeys],
         cogs=[molecules_dict[m]['cog'] for m in mkeys],
         mol_types=[molecules_dict[m]['type'] for m in mkeys],
-        voxels=[molecules_dict[m]['voxel'] for m in mkeys])
+        voxels=voxels)
 
 def get_rxns_serial(molecules,voxelID2idx,diffusion_rate,rxnscaling,rxn_data,minimum_diffusion_rate):
     """Creates instance of class hybridmdmc.classes.ReactionList.

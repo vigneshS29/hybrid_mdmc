@@ -371,3 +371,100 @@ def parse_scale(scale_file,windowsize_MDMCcycles=1e10):
         data=scale_data)
 
     return scale,MDMCcycles
+
+
+def read_notebook(filename_notebook):
+    notebook = pd.read_excel(filename_notebook,sheet_name=None,index_col=None,header=None)
+
+    # System
+    dict_ = {}
+    for index, row in notebook['System'].iterrows():
+        if row[1] == '-': continue
+        if row[1] == 'false':
+            row[1] = False
+        if row[1] == 'true':
+            row[1] = True
+        dict_[row[0]] = row[1]
+
+    # Header
+    dict_['header'] = {'masses': []}
+    for index, row in notebook['Header'].iterrows():
+        if 'types' in row[0]:
+            dict_['header']['_'.join(row[0].split())] = int(row[1])
+        elif 'mass' in row[0]:
+            dict_['header']['masses'].append(tuple([int(row[0].split()[1]), float(row[1])]))
+
+    # Species
+    dict_['starting_species'] = {}
+    dict_['masterspecies'] = {}
+    notebook['Species'].dropna(how='all', inplace=True)
+    category_series = notebook['Species'].iloc[:,0]
+    category_series.ffill(inplace=True)
+    categories = [(index,value,notebook['Species'].loc[index,1]) for index, value in category_series.items()]
+    msf_categories = ['Atoms','Bonds','Angles','Dihedrals','Impropers']
+    row_map = {key:{
+                v[2]:v[0] for v in categories if v[1] == key}
+                    for key in msf_categories}
+    species = None
+    for column_idx in notebook['Species'].iloc[:,2:].columns:
+        column = notebook['Species'].loc[:,column_idx]
+        if not pd.isna(column[0]):
+            species = column[0]
+            dict_['masterspecies'][species] = {_:[] for _ in msf_categories}
+            dict_['starting_species'][species] = int(column[2])
+        # atoms
+        if not pd.isna(column[row_map['Atoms']['ID']]):
+            dict_['masterspecies'][species]['Atoms'].append([
+                int(column[row_map['Atoms']['ID']]),
+                0,
+                int(column[row_map['Atoms']['type']]),
+                float(column[row_map['Atoms']['charge']]),
+                float(column[row_map['Atoms']['x']]),
+                float(column[row_map['Atoms']['y']]),
+                float(column[row_map['Atoms']['z']]),
+            ])
+        # interactions
+        for interaction in msf_categories[1:]:
+            if not pd.isna(column[row_map[interaction]['ID']]):
+                list_ = [
+                    int(column[row_map[interaction]['ID']]),
+                    int(column[row_map[interaction]['type']]),
+                    int(column[row_map[interaction]['i']]),
+                    int(column[row_map[interaction]['j']])]
+                if 'k' in row_map[interaction].keys():
+                    list_.append(int(column[row_map[interaction]['k']]))
+                if 'l' in row_map[interaction].keys():
+                    list_.append(int(column[row_map[interaction]['l']]))
+                dict_['masterspecies'][species][interaction].append(list_)
+
+    # Reactions
+    dict_['reaction_data'] = {}
+    row_map = {val:idx for idx,val in notebook['Reactions'].iloc[:,0].items()}
+    dict_['reaction_data'] = {
+        int(column[row_map['reaction ID']]): {
+            'reactant_molecules': column[row_map['reactant(s)']].split(','),
+            'product_molecules': column[row_map['product(s)']].split(','),
+            'A': column[row_map['A (1/s)']],
+            'b': column[row_map['b']],
+            'Ea': column[row_map['Ea (kcal/mol)']],
+        }
+        for idx,column in notebook['Reactions'].iloc[:,1:].items()
+    }
+
+    # Initial MD
+    dict_['initial_MD_init_dict'] = {}
+    for index,row in notebook['Initial MD'].iterrows():
+        if 'run' in row[0]:
+            dict_['initial_MD_init_dict'][row[0]] = list(row[1:])
+        else:
+            dict_['initial_MD_init_dict'][row[0]] = row[1]
+    
+    # Cycled MD
+    dict_['cycled_MD_init_dict'] = {}
+    for index,row in notebook['Cycled MD'].iterrows():
+        if 'run' in row[0]:
+            dict_['cycled_MD_init_dict'][row[0]] = list(row[1:])
+        else:
+            dict_['cycled_MD_init_dict'][row[0]] = row[1]
+
+    return dict_

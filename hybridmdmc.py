@@ -15,7 +15,8 @@ from hybrid_mdmc.parsers import *
 from hybrid_mdmc.kmc import *
 from hybrid_mdmc.functions import *
 from hybrid_mdmc.calc_voxels import *
-from hybrid_mdmc.diffusion import *
+from hybrid_mdmc.voxels import Voxels
+from hybrid_mdmc.diffusion import Diffusion
 
 # Main argument
 def main(argv):
@@ -201,19 +202,21 @@ def main(argv):
     }
     if args.debug:
         breakpoint()
-    if not args.well_mixed:
-        diffusion_rate = calc_diffusionrate(
+    if args.well_mixed is False:
+        voxels_datafile = Voxels(box, args.number_of_voxels)
+        diffusion = Diffusion(
+            'toy320.60A',
             args.filename_trajectory,
             atoms,
-            box,
-            masterspecies,
-            args.number_of_voxels,
-            xbounds=args.x_bounds,
-            ybounds=args.y_bounds,
-            zbounds=args.z_bounds,
-            lammps_stepsize=args.lammps_stepsize,
-            lammps_time_units_to_seconds_conversion=args.lammps_time_units_to_seconds_conversion,
-        )
+            molecules,
+            voxels_datafile,
+            time_conversion=args.lammps_time_units_to_seconds_conversion)
+        diffusion.parse_trajectory_file(start=0, end=-1, every=1)
+        diffusion.calculate_direct_voxel_transition_rates()
+        diffusion.perform_random_walks(number_of_steps=864,species='A')
+        diffusion.calculate_average_first_time_between_positions(species='A')
+        diffusion.calculate_diffusion_rates(species='A')
+        diffusion_rate['A'] = diffusion.diffusion_rate
 
     # Append the diffusion file
     with open(args.filename_diffusion,'a') as f:
